@@ -1827,8 +1827,31 @@ function QuoteDetail({
 
   const [cancellingQuote, setCancellingQuote] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [editItemDraft, setEditItemDraft] = useState<QuoteItem | null>(null);
+  const [addingQuoteItem, setAddingQuoteItem] = useState(false);
+  const [newQuoteItem, setNewQuoteItem] = useState<Omit<QuoteItem, "id">>({ title: "", description: "", amount: "" });
 
   const isReadOnly = quote.status === "Aprovado" || quote.status === "Cancelado";
+
+  const saveItemEdit = () => {
+    if (!editItemDraft) return;
+    onUpdateQuote({ ...quote, items: quote.items.map(i => i.id === editItemDraft.id ? editItemDraft : i) });
+    setEditingItemId(null);
+    setEditItemDraft(null);
+  };
+
+  const removeItem = (id: number) => {
+    onUpdateQuote({ ...quote, items: quote.items.filter(i => i.id !== id) });
+  };
+
+  const addQuoteItem = () => {
+    if (!newQuoteItem.title.trim() || !newQuoteItem.amount.trim()) return;
+    const newId = Math.max(0, ...quote.items.map(i => i.id)) + 1;
+    onUpdateQuote({ ...quote, items: [...quote.items, { ...newQuoteItem, id: newId }] });
+    setNewQuoteItem({ title: "", description: "", amount: "" });
+    setAddingQuoteItem(false);
+  };
 
   const handleStartAnalysis = () => {
     const now = new Date();
@@ -1945,27 +1968,96 @@ function QuoteDetail({
         {/* Items section */}
         <div className="bg-card border border-border rounded-xl p-4 space-y-3">
           <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Itens do orçamento</p>
-          {quote.items.length === 0 ? (
+          {quote.items.length === 0 && !addingQuoteItem && (
             <p className="text-sm text-muted-foreground">Nenhum item cadastrado.</p>
-          ) : (
-            <div className="space-y-2">
-              {quote.items.map(item => (
-                <div key={item.id} className="flex items-center justify-between bg-muted rounded-lg px-3 py-2.5">
+          )}
+          <div className="space-y-2">
+            {quote.items.map(item => (
+              editingItemId === item.id && editItemDraft ? (
+                <div key={item.id} className="border border-accent/30 rounded-xl p-3 space-y-2.5 bg-accent/5">
+                  <input
+                    type="text"
+                    value={editItemDraft.title}
+                    onChange={e => setEditItemDraft({ ...editItemDraft, title: e.target.value })}
+                    placeholder="Título do item"
+                    className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border"
+                  />
+                  <input
+                    type="text"
+                    value={editItemDraft.description}
+                    onChange={e => setEditItemDraft({ ...editItemDraft, description: e.target.value })}
+                    placeholder="Descrição (opcional)"
+                    className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border"
+                  />
+                  <div className="relative">
+                    <DollarSign size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={editItemDraft.amount}
+                      onChange={e => setEditItemDraft({ ...editItemDraft, amount: e.target.value })}
+                      placeholder="Valor (R$)"
+                      className="w-full bg-input-background rounded-lg pl-8 pr-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border font-mono"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => { setEditingItemId(null); setEditItemDraft(null); }} className="flex-1 py-1.5 bg-muted text-muted-foreground rounded-lg text-xs font-medium hover:bg-secondary transition-colors">Cancelar</button>
+                    <button type="button" onClick={saveItemEdit} disabled={!editItemDraft.title.trim()} className="flex-1 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/80 transition-colors disabled:opacity-40">Salvar</button>
+                  </div>
+                </div>
+              ) : (
+                <div key={item.id} className="flex items-center justify-between bg-muted rounded-lg px-3 py-2.5 gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground">{item.title}</p>
                     {item.description && <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>}
                   </div>
-                  <span className="text-sm font-mono font-semibold text-foreground shrink-0 ml-3">
+                  <span className="text-sm font-mono font-semibold text-foreground shrink-0">
                     {fmt(parseFloat(item.amount.replace(/\./g, "").replace(",", ".")) || 0)}
                   </span>
+                  {!isReadOnly && (
+                    <div className="flex gap-1 shrink-0">
+                      <button type="button" onClick={() => { setEditingItemId(item.id); setEditItemDraft({ ...item }); }} className="p-1.5 rounded hover:bg-accent/10 text-muted-foreground hover:text-accent transition-colors">
+                        <FileText size={13} />
+                      </button>
+                      <button type="button" onClick={() => removeItem(item.id)} className="p-1.5 rounded hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ))}
+              )
+            ))}
+
+            {/* Adicionar item inline */}
+            {!isReadOnly && (
+              addingQuoteItem ? (
+                <div className="border border-accent/30 rounded-xl p-3 space-y-2.5 bg-accent/5">
+                  <input type="text" value={newQuoteItem.title} onChange={e => setNewQuoteItem({ ...newQuoteItem, title: e.target.value })} placeholder="Título do item" className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border" />
+                  <input type="text" value={newQuoteItem.description} onChange={e => setNewQuoteItem({ ...newQuoteItem, description: e.target.value })} placeholder="Descrição (opcional)" className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border" />
+                  <div className="relative">
+                    <DollarSign size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input type="text" value={newQuoteItem.amount} onChange={e => setNewQuoteItem({ ...newQuoteItem, amount: e.target.value })} placeholder="Valor (R$)" className="w-full bg-input-background rounded-lg pl-8 pr-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border font-mono" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => { setAddingQuoteItem(false); setNewQuoteItem({ title: "", description: "", amount: "" }); }} className="flex-1 py-1.5 bg-muted text-muted-foreground rounded-lg text-xs font-medium hover:bg-secondary transition-colors">Cancelar</button>
+                    <button type="button" onClick={addQuoteItem} disabled={!newQuoteItem.title.trim() || !newQuoteItem.amount.trim()} className="flex-1 py-1.5 bg-accent text-accent-foreground rounded-lg text-xs font-medium hover:bg-amber-600 transition-colors disabled:opacity-40">Adicionar</button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setAddingQuoteItem(true)} className="w-full py-2 border border-dashed border-border rounded-xl text-xs text-muted-foreground hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2">
+                  <PackagePlus size={13} /> Adicionar item
+                </button>
+              )
+            )}
+
+            {quote.items.length > 0 && (
               <div className="flex items-center justify-between pt-2 border-t border-border">
                 <span className="text-sm font-medium text-muted-foreground">Total orçado</span>
-                <span className="text-sm font-mono font-semibold text-foreground">{fmt(quote.budgeted)}</span>
+                <span className="text-sm font-mono font-semibold text-foreground">
+                  {fmt(quote.items.reduce((s, i) => s + (parseFloat(i.amount.replace(/\./g, "").replace(",", ".")) || 0), 0))}
+                </span>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Dates section */}
