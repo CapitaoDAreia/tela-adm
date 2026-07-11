@@ -1353,8 +1353,8 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
           <CheckCircle size={32} className="text-green-600" />
         </div>
         <div className="text-center">
-          <h2 className="text-xl font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>Pré-orçamento gerado!</h2>
-          <p className="text-sm text-muted-foreground mt-1">Um link foi enviado para o cliente.</p>
+          <h2 className="text-xl font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>Orçamento gerado!</h2>
+          <p className="text-sm text-muted-foreground mt-1">Gerado em {submittedAt}</p>
         </div>
         <div className="w-full max-w-sm bg-card border border-border rounded-xl p-4 space-y-2">
           <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Resumo</p>
@@ -1363,44 +1363,76 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
             <span className="font-medium">{form.clientName || "—"}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Tipo</span>
-            <span className="font-medium">Studio residencial</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Custo orçado</span>
-            <span className="font-medium font-mono">{totalValue > 0 ? fmt(totalValue) : "—"}</span>
+            <span className="text-muted-foreground">Itens</span>
+            <span className="font-medium">{items.length} item{items.length !== 1 ? "s" : ""}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Valor do contrato</span>
-            <span className="font-medium font-mono">
+            <span className="font-medium font-mono text-accent">
               {form.contractValue ? fmt(parseFloat(form.contractValue.replace(/\./g, "").replace(",", ".")) || 0) : "—"}
             </span>
           </div>
-          {form.contractValue && totalValue > 0 && (() => {
-            const contract = parseFloat(form.contractValue.replace(/\./g, "").replace(",", ".")) || 0;
-            const margin = contract - totalValue;
-            const pct = contract > 0 ? (margin / contract) * 100 : 0;
-            return (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Margem prevista</span>
-                <span className={`font-medium font-mono ${margin >= 0 ? "text-green-600" : "text-red-500"}`}>
-                  {fmt(margin)} ({pct.toFixed(1)}%)
-                </span>
-              </div>
-            );
-          })()}
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Gerado em</span>
-            <span className="font-medium font-mono">{submittedAt}</span>
-          </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Início / Entrega</span>
-            <span className="font-medium font-mono">{form.startDate || "—"} → {form.endDate || "—"}</span>
+            <span className="font-medium font-mono">
+              {form.startDate ? new Date(form.startDate + "T12:00:00").toLocaleDateString("pt-BR") : "—"}
+              {" → "}
+              {form.endDate ? new Date(form.endDate + "T12:00:00").toLocaleDateString("pt-BR") : "—"}
+            </span>
           </div>
         </div>
         <div className="flex gap-3 w-full max-w-sm">
-          <button className="flex-1 py-3 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors">
-            Compartilhar link
+          <button
+            type="button"
+            onClick={() => {
+              const contractVal = parseFloat(form.contractValue.replace(/\./g, "").replace(",", ".")) || 0;
+              const itemsHtml = items.map(it => `
+                <tr>
+                  <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0">
+                    <div style="font-size:13px;font-weight:600;color:#1a1a1a">${it.title}</div>
+                    ${it.description ? `<div style="font-size:11px;color:#888;margin-top:2px">${it.description}</div>` : ""}
+                  </td>
+                </tr>`).join("");
+              const startStr = form.startDate ? new Date(form.startDate + "T12:00:00").toLocaleDateString("pt-BR") : "—";
+              const endStr = form.endDate ? new Date(form.endDate + "T12:00:00").toLocaleDateString("pt-BR") : "—";
+              const win = window.open("", "_blank");
+              if (!win) return;
+              win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+              <title>Orçamento – ${form.clientName}</title>
+              <style>
+                body{font-family:system-ui,sans-serif;color:#1a1a1a;padding:40px;max-width:680px;margin:0 auto}
+                h1{font-size:26px;margin:0 0 4px;font-weight:700}
+                h2{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#999;margin:28px 0 10px;padding-bottom:6px;border-bottom:1px solid #eee}
+                table{width:100%;border-collapse:collapse}
+                .total{display:flex;justify-content:space-between;align-items:center;padding:12px;background:#fafafa;border-radius:8px;margin-top:8px}
+                .total-label{font-size:13px;color:#555}
+                .total-value{font-size:20px;font-weight:700;color:#D97706}
+                .date-row{display:flex;gap:32px;margin-top:4px}
+                .date-item{font-size:12px;color:#555}
+                .date-item span{display:block;font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+                @media print{body{padding:24px}}
+              </style></head><body>
+              <p style="font-size:10px;color:#aaa;margin:0 0 16px;letter-spacing:.08em;text-transform:uppercase">Orçamento · Gerado em ${submittedAt}</p>
+              <h1>${form.clientName || "Cliente"}</h1>
+              ${form.description ? `<p style="font-size:13px;color:#666;margin:6px 0 0">${form.description}</p>` : ""}
+              <h2>Escopo do serviço</h2>
+              <table><tbody>${itemsHtml}</tbody></table>
+              <div class="total">
+                <span class="total-label">Valor total do contrato</span>
+                <span class="total-value">${contractVal > 0 ? contractVal.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }) : "—"}</span>
+              </div>
+              <h2>Datas previstas</h2>
+              <div class="date-row">
+                <div class="date-item"><span>Início da obra</span>${startStr}</div>
+                <div class="date-item"><span>Entrega prevista</span>${endStr}</div>
+              </div>
+              <script>window.onload=()=>{window.print()}<\/script>
+              </body></html>`);
+              win.document.close();
+            }}
+            className="flex-1 py-3 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+          >
+            <Printer size={15} /> Gerar PDF
           </button>
           <button onClick={onBack} className="flex-1 py-3 bg-secondary text-secondary-foreground rounded-xl text-sm font-medium hover:bg-muted transition-colors">
             Ver Orçamentos
