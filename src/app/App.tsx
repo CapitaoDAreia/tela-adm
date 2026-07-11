@@ -1,0 +1,1905 @@
+import { useState } from "react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+} from "recharts";
+import {
+  Plus, Building2, TrendingUp, Clock, ArrowLeft, X,
+  Camera, FileText, LayoutDashboard, Receipt, Image,
+  CheckCircle, Circle, Upload, Phone, User, DollarSign,
+  HardHat, Wrench, Home, CalendarDays, CalendarCheck, CalendarClock,
+  ListChecks, ChevronRight, Trash2, PackagePlus, ClipboardList, FilePlus
+} from "lucide-react";
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+type Screen = "dashboard" | "detail" | "newQuote" | "quotes" | "quoteDetail";
+
+interface QuoteItem {
+  id: number;
+  title: string;
+  description: string;
+  amount: string;
+}
+
+type QuoteStatus = "Solicitado" | "Em análise" | "Aprovado" | "Rejeitado";
+
+interface QuoteRecord {
+  id: number;
+  clientName: string;
+  phone: string;
+  description: string;
+  items: QuoteItem[];
+  budgeted: number;
+  contractValue: number;
+  urgency: string;
+  quoteDeadline: string;
+  startDate: string;
+  endDate: string;
+  status: QuoteStatus;
+  milestones: Milestone[];
+  createdAt: string;
+}
+
+type ProjectStatus = "Em andamento" | "Concluído" | "Pausado" | "Orçamento";
+
+interface Expense {
+  id: number;
+  date: string;
+  description: string;
+  category: string;
+  amount: number;
+}
+
+type StepStatus = "Concluído" | "Em andamento" | "Pendente" | "Cancelado";
+
+interface Milestone {
+  label: string;
+  done: boolean;
+  date: string;
+  status: StepStatus;
+  description: string;
+  deadline: string;
+  completedAt: string;
+  photos: string[];
+}
+
+interface Project {
+  id: number;
+  name: string;
+  client: string;
+  status: ProjectStatus;
+  progress: number;
+  contractValue: number;
+  budgeted: number;
+  spent: number;
+  phase: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  quoteDeadline: string;
+  image: string;
+  expenses: Expense[];
+  milestones: Milestone[];
+  photos: { url: string; caption: string; date: string }[];
+}
+
+// ─── Mock Data ───────────────────────────────────────────────────────────────
+
+const PROJECTS: Project[] = [
+  {
+    id: 1,
+    name: "Studio Monteiro",
+    client: "Rafael Monteiro",
+    status: "Em andamento",
+    progress: 62,
+    contractValue: 104400,
+    budgeted: 87000,
+    spent: 53940,
+    phase: "Acabamento – piso e pintura",
+    location: "Ap. 74 · Ed. Araucária, Pinheiros – SP",
+    startDate: "10/03/2025",
+    endDate: "29/08/2025",
+    quoteDeadline: "28/02/2025",
+    image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&h=500&fit=crop&auto=format",
+    expenses: [
+      { id: 1, date: "02 Jul 2025", description: "Porcelanato 60×60 – área social", category: "Material", amount: 4800 },
+      { id: 2, date: "28 Jun 2025", description: "Mão de obra – pintura interna", category: "Serviço", amount: 2900 },
+      { id: 3, date: "21 Jun 2025", description: "Instalação elétrica – pontos extras", category: "Serviço", amount: 1950 },
+      { id: 4, date: "15 Jun 2025", description: "Bancada de quartzo – cozinha compacta", category: "Material", amount: 3400 },
+      { id: 5, date: "07 Jun 2025", description: "Louças e metais – banheiro", category: "Material", amount: 2750 },
+    ],
+    milestones: [
+      { label: "Demolição e limpeza", done: true, date: "Mar 2025", status: "Concluído", description: "Remoção do revestimento existente, demolição de paredes não estruturais e limpeza completa do apartamento.", deadline: "20/03/2025", completedAt: "18/03/2025", photos: ["https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=400&h=300&fit=crop"] },
+      { label: "Instalações hidráulicas", done: true, date: "Abr 2025", status: "Concluído", description: "Substituição de toda a tubulação de água fria, quente e esgoto do banheiro e cozinha compacta.", deadline: "30/04/2025", completedAt: "28/04/2025", photos: [] },
+      { label: "Instalações elétricas", done: true, date: "Mai 2025", status: "Concluído", description: "Passagem de fiação nova, instalação de quadro de distribuição e pontos de tomada conforme projeto.", deadline: "30/05/2025", completedAt: "27/05/2025", photos: [] },
+      { label: "Revestimentos e piso", done: false, date: "Jul 2025", status: "Em andamento", description: "Assentamento de porcelanato 60×60 na área social e banheiro, incluindo rejunte e rodapés.", deadline: "25/07/2025", completedAt: "", photos: [] },
+      { label: "Pintura e acabamentos", done: false, date: "Ago 2025", status: "Pendente", description: "Aplicação de massa corrida, tinta látex premium em todas as paredes e teto, instalação de luminárias.", deadline: "29/08/2025", completedAt: "", photos: [] },
+    ],
+    photos: [
+      { url: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600&h=400&fit=crop&auto=format", caption: "Cozinha compacta – pré-acabamento", date: "30 Jun 2025" },
+      { url: "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=600&h=400&fit=crop&auto=format", caption: "Área integrada – reboco pronto", date: "22 Jun 2025" },
+      { url: "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?w=600&h=400&fit=crop&auto=format", caption: "Banheiro – azulejo assentado", date: "14 Jun 2025" },
+    ],
+  },
+  {
+    id: 2,
+    name: "Studio Ferreira",
+    client: "Camila Ferreira",
+    status: "Em andamento",
+    progress: 38,
+    contractValue: 88800,
+    budgeted: 74000,
+    spent: 28120,
+    phase: "Alvenaria e instalações",
+    location: "Ap. 32 · Ed. Vila Nova, Vila Madalena – SP",
+    startDate: "05/05/2025",
+    endDate: "31/10/2025",
+    quoteDeadline: "25/04/2025",
+    image: "https://images.unsplash.com/photo-1554995207-c18c203602cb?w=800&h=500&fit=crop&auto=format",
+    expenses: [
+      { id: 1, date: "03 Jul 2025", description: "Tijolo de vedação – paredes divisórias", category: "Material", amount: 1800 },
+      { id: 2, date: "01 Jul 2025", description: "Mão de obra – alvenaria", category: "Serviço", amount: 3200 },
+      { id: 3, date: "25 Jun 2025", description: "Tubulação hidráulica – banheiro e cozinha", category: "Material", amount: 1450 },
+    ],
+    milestones: [
+      { label: "Demolição e adequação", done: true, date: "Mai 2025", status: "Concluído", description: "Demolição de revestimentos e adaptação do layout conforme projeto aprovado.", deadline: "10/05/2025", completedAt: "09/05/2025", photos: ["https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=400&h=300&fit=crop"] },
+      { label: "Alvenaria e divisórias", done: false, date: "Jul 2025", status: "Em andamento", description: "Construção das novas divisórias em alvenaria para separação de ambientes conforme planta.", deadline: "20/07/2025", completedAt: "", photos: [] },
+      { label: "Instalações elétricas e hidráulicas", done: false, date: "Ago 2025", status: "Pendente", description: "Passagem de tubulações e fiação elétrica completa.", deadline: "31/08/2025", completedAt: "", photos: [] },
+      { label: "Revestimentos e piso", done: false, date: "Set 2025", status: "Pendente", description: "", deadline: "30/09/2025", completedAt: "", photos: [] },
+      { label: "Pintura e entrega", done: false, date: "Out 2025", status: "Pendente", description: "", deadline: "31/10/2025", completedAt: "", photos: [] },
+    ],
+    photos: [
+      { url: "https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=600&h=400&fit=crop&auto=format", caption: "Demolição concluída", date: "28 Jun 2025" },
+    ],
+  },
+  {
+    id: 3,
+    name: "Studio Nakamura",
+    client: "Yuki Nakamura",
+    status: "Concluído",
+    progress: 100,
+    contractValue: 81600,
+    budgeted: 68000,
+    spent: 65500,
+    phase: "Entregue",
+    location: "Ap. 112 · Ed. Ouro Preto, Consolação – SP",
+    startDate: "04/11/2024",
+    endDate: "18/03/2025",
+    quoteDeadline: "22/10/2024",
+    image: "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&h=500&fit=crop&auto=format",
+    expenses: [
+      { id: 1, date: "18 Mar 2025", description: "Móvel planejado – parede multifuncional", category: "Material", amount: 9800 },
+      { id: 2, date: "10 Mar 2025", description: "Mão de obra final e limpeza", category: "Serviço", amount: 1400 },
+    ],
+    milestones: [
+      { label: "Demolição e limpeza", done: true, date: "Nov 2024", status: "Concluído", description: "Demolição completa do revestimento original.", deadline: "15/11/2024", completedAt: "14/11/2024", photos: [] },
+      { label: "Instalações elétricas e hidráulicas", done: true, date: "Dez 2024", status: "Concluído", description: "Toda a infraestrutura de instalações substituída.", deadline: "20/12/2024", completedAt: "19/12/2024", photos: [] },
+      { label: "Revestimentos e piso", done: true, date: "Jan 2025", status: "Concluído", description: "Porcelanato assentado em todo o apartamento.", deadline: "31/01/2025", completedAt: "28/01/2025", photos: [] },
+      { label: "Pintura e acabamentos", done: true, date: "Fev 2025", status: "Concluído", description: "Pintura e instalações finais concluídas.", deadline: "28/02/2025", completedAt: "25/02/2025", photos: [] },
+      { label: "Móveis e entrega", done: true, date: "Mar 2025", status: "Concluído", description: "Instalação de móveis planejados e entrega ao cliente.", deadline: "20/03/2025", completedAt: "18/03/2025", photos: ["https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=400&h=300&fit=crop"] },
+    ],
+    photos: [
+      { url: "https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=600&h=400&fit=crop&auto=format", caption: "Área integrada – entregue", date: "18 Mar 2025" },
+      { url: "https://images.unsplash.com/photo-1631679706909-1844bbd07221?w=600&h=400&fit=crop&auto=format", caption: "Banheiro finalizado", date: "18 Mar 2025" },
+    ],
+  },
+  {
+    id: 4,
+    name: "Studio Carvalho",
+    client: "Bruno Carvalho",
+    status: "Orçamento",
+    progress: 0,
+    contractValue: 109200,
+    budgeted: 91000,
+    spent: 0,
+    phase: "Aguardando aprovação",
+    location: "Ap. 205 · Ed. Parque Sul, Moema – SP",
+    startDate: "–",
+    endDate: "–",
+    quoteDeadline: "18/07/2025",
+    image: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&h=500&fit=crop&auto=format",
+    expenses: [],
+    milestones: [
+      { label: "Visita técnica", done: true, date: "Jun 2025", status: "Concluído", description: "Visita ao apartamento para levantamento e medições.", deadline: "20/06/2025", completedAt: "18/06/2025", photos: [] },
+      { label: "Aprovação do orçamento", done: false, date: "Jul 2025", status: "Pendente", description: "Aguardando assinatura do contrato e aprovação formal.", deadline: "18/07/2025", completedAt: "", photos: [] },
+      { label: "Início da obra", done: false, date: "Ago 2025", status: "Pendente", description: "", deadline: "04/08/2025", completedAt: "", photos: [] },
+    ],
+    photos: [],
+  },
+];
+
+const MOCK_QUOTES: QuoteRecord[] = [
+  {
+    id: 101,
+    clientName: "Isabela Ramos",
+    phone: "",
+    description: "Studio 48m², Consolação",
+    items: [
+      { id: 1, title: "Demolição e limpeza", description: "", amount: "8000" },
+      { id: 2, title: "Instalações hidráulicas", description: "", amount: "12000" },
+      { id: 3, title: "Revestimentos e piso", description: "", amount: "22000" },
+      { id: 4, title: "Pintura e acabamentos", description: "", amount: "14000" },
+      { id: 5, title: "Móveis planejados", description: "", amount: "6000" },
+    ],
+    budgeted: 62000,
+    contractValue: 74400,
+    urgency: "Normal",
+    quoteDeadline: "25/07/2025",
+    startDate: "",
+    endDate: "",
+    status: "Em análise",
+    milestones: [
+      { label: "Avaliação do orçamento", done: false, date: "Jul 2025", status: "Em andamento", description: "Análise técnica e comercial do escopo solicitado.", deadline: "25/07/2025", completedAt: "", photos: [] },
+    ],
+    createdAt: "08/07/2025",
+  },
+  {
+    id: 102,
+    clientName: "Fernando Costa",
+    phone: "",
+    description: "Studio 35m², Moema",
+    items: [
+      { id: 1, title: "Demolição", description: "", amount: "5000" },
+      { id: 2, title: "Hidráulica e elétrica", description: "", amount: "18000" },
+      { id: 3, title: "Piso e revestimentos", description: "", amount: "16000" },
+      { id: 4, title: "Pintura", description: "", amount: "9000" },
+    ],
+    budgeted: 48000,
+    contractValue: 57600,
+    urgency: "Urgente",
+    quoteDeadline: "15/07/2025",
+    startDate: "",
+    endDate: "",
+    status: "Solicitado",
+    milestones: [
+      { label: "Avaliação do orçamento", done: false, date: "Jul 2025", status: "Pendente", description: "", deadline: "15/07/2025", completedAt: "", photos: [] },
+    ],
+    createdAt: "07/07/2025",
+  },
+  {
+    id: 103,
+    clientName: "Mariana Luz",
+    phone: "",
+    description: "Studio 52m², Pinheiros",
+    items: [
+      { id: 1, title: "Demolição completa", description: "", amount: "9000" },
+      { id: 2, title: "Hidráulica", description: "", amount: "14000" },
+      { id: 3, title: "Elétrica", description: "", amount: "11000" },
+      { id: 4, title: "Porcelanato e piso aquecido", description: "", amount: "28000" },
+      { id: 5, title: "Pintura e gesso", description: "", amount: "17000" },
+    ],
+    budgeted: 79000,
+    contractValue: 94800,
+    urgency: "Planejado",
+    quoteDeadline: "30/06/2025",
+    startDate: "",
+    endDate: "",
+    status: "Aprovado",
+    milestones: [
+      { label: "Avaliação do orçamento", done: true, date: "Jun 2025", status: "Concluído", description: "Escopo aprovado pela cliente após ajustes.", deadline: "30/06/2025", completedAt: "28/06/2025", photos: [] },
+    ],
+    createdAt: "20/06/2025",
+  },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const fmt = (n: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(n);
+
+const statusColors: Record<ProjectStatus, string> = {
+  "Em andamento": "bg-blue-100 text-blue-700",
+  "Concluído": "bg-green-100 text-green-700",
+  "Pausado": "bg-yellow-100 text-yellow-700",
+  "Orçamento": "bg-purple-100 text-purple-700",
+};
+
+const statusDot: Record<ProjectStatus, string> = {
+  "Em andamento": "bg-blue-500",
+  "Concluído": "bg-green-500",
+  "Pausado": "bg-yellow-500",
+  "Orçamento": "bg-purple-500",
+};
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function StatCard({ icon, label, value, sub, color }: {
+  icon: React.ReactNode; label: string; value: string; sub?: string; color: string;
+}) {
+  return (
+    <div className="bg-card rounded-xl border border-border p-5 flex gap-4 items-start">
+      <div className={`rounded-lg p-2.5 ${color}`}>{icon}</div>
+      <div>
+        <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider">{label}</p>
+        <p className="text-2xl font-semibold text-foreground mt-0.5" style={{ fontFamily: "'DM Serif Display', serif" }}>{value}</p>
+        {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+function ProgressBar({ value, color = "bg-accent" }: { value: number; color?: string }) {
+  return (
+    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+      <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${value}%` }} />
+    </div>
+  );
+}
+
+// ─── Screen A: Dashboard ──────────────────────────────────────────────────────
+
+function Dashboard({ projects, onOpenProject, onNewProject }: {
+  projects: Project[];
+  onOpenProject: (p: Project) => void;
+  onNewProject: () => void;
+}) {
+  const active = projects.filter(p => p.status === "Em andamento");
+  const pending = projects.filter(p => p.status === "Orçamento");
+  const totalSpent = projects.reduce((s, p) => s + p.spent, 0);
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Topbar */}
+      <header className="bg-primary text-primary-foreground px-6 py-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <HardHat size={22} />
+          <div>
+            <p className="text-xs text-primary-foreground/60 font-mono uppercase tracking-widest">Construtora</p>
+            <h1 className="text-lg font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>Exemplo Nome</h1>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-primary-foreground/60">Julho 2025</p>
+          <p className="text-sm font-medium">Dashboard</p>
+        </div>
+      </header>
+
+      <main className="max-w-2xl mx-auto px-4 py-6 pb-24">
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <StatCard
+            icon={<Building2 size={18} className="text-blue-600" />}
+            label="Em execução"
+            value={String(active.length)}
+            sub={`${projects.length} obras total`}
+            color="bg-blue-50"
+          />
+          <StatCard
+            icon={<Clock size={18} className="text-yellow-600" />}
+            label="Orçamentos"
+            value={String(pending.length)}
+            sub="Aguardando aprovação"
+            color="bg-yellow-50"
+          />
+          <StatCard
+            icon={<TrendingUp size={18} className="text-accent" />}
+            label="Gasto no mês"
+            value="R$ 127k"
+            sub="Jun–Jul 2025"
+            color="bg-orange-50"
+          />
+          <StatCard
+            icon={<DollarSign size={18} className="text-green-600" />}
+            label="Total executado"
+            value={`R$ ${(totalSpent / 1e6).toFixed(1)}M`}
+            sub="Acumulado 2025"
+            color="bg-green-50"
+          />
+        </div>
+
+        {/* Section title */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-foreground">Obras</h2>
+          <span className="text-xs text-muted-foreground font-mono">{projects.length} projetos</span>
+        </div>
+
+        {/* Project cards */}
+        <div className="space-y-3">
+          {projects.map(project => (
+            <button
+              key={project.id}
+              onClick={() => onOpenProject(project)}
+              className="w-full bg-card border border-border rounded-xl overflow-hidden text-left hover:shadow-md hover:border-accent/30 transition-all group"
+            >
+              <div className="relative h-28 overflow-hidden bg-muted">
+                <img
+                  src={project.image}
+                  alt={project.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                <div className="absolute bottom-2 left-3 right-3 flex items-end justify-between">
+                  <span className="text-white text-sm font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>
+                    {project.name}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[project.status]}`}>
+                    {project.status}
+                  </span>
+                </div>
+              </div>
+              <div className="px-4 py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-muted-foreground">{project.phase}</span>
+                  <span className="text-xs font-mono font-medium text-foreground">{project.progress}%</span>
+                </div>
+                <ProgressBar
+                  value={project.progress}
+                  color={project.status === "Concluído" ? "bg-green-500" : project.status === "Pausado" ? "bg-yellow-400" : "bg-accent"}
+                />
+                <div className="flex items-center justify-between mt-2.5">
+                  <span className="text-xs text-muted-foreground">{project.client}</span>
+                  <span className="text-xs font-mono text-muted-foreground">
+                    {fmt(project.spent)} / {fmt(project.budgeted)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border">
+                  {project.startDate !== "–" ? (
+                    <>
+                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-mono">
+                        <CalendarDays size={10} /> {project.startDate}
+                      </span>
+                      <span className="text-muted-foreground/40 text-[10px]">→</span>
+                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-mono">
+                        <CalendarCheck size={10} /> {project.endDate}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-mono">
+                      <CalendarClock size={10} /> Orçamento válido até {project.quoteDeadline}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </main>
+
+      {/* FAB */}
+      <button
+        onClick={onNewProject}
+        className="fixed bottom-6 right-6 bg-accent text-accent-foreground rounded-full w-14 h-14 flex items-center justify-center shadow-lg hover:bg-amber-600 transition-colors z-50"
+      >
+        <Plus size={24} />
+      </button>
+    </div>
+  );
+}
+
+// ─── Screen B: Project Detail ─────────────────────────────────────────────────
+
+type DetailTab = "visao" | "etapas" | "despesas" | "galeria";
+
+const STEP_STATUS_CONFIG: Record<StepStatus, { label: string; color: string; dot: string }> = {
+  "Concluído":    { label: "Concluído",    color: "bg-emerald-900/40 text-emerald-400 border-emerald-800", dot: "bg-emerald-400" },
+  "Em andamento": { label: "Em andamento", color: "bg-primary/20 text-primary border-primary/30",           dot: "bg-primary" },
+  "Pendente":     { label: "Pendente",     color: "bg-muted text-muted-foreground border-border",           dot: "bg-muted-foreground" },
+  "Cancelado":    { label: "Cancelado",    color: "bg-red-900/30 text-red-400 border-red-900",              dot: "bg-red-400" },
+};
+
+function StepModal({ step, onClose, onSave, isNew = false }: {
+  step: Milestone;
+  onClose: () => void;
+  onSave: (updated: Milestone) => void;
+  isNew?: boolean;
+}) {
+  const [draft, setDraft] = useState<Milestone>({ ...step });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-card border border-border rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto z-10">
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="w-10 h-1 rounded-full bg-border" />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h3 className="text-base font-semibold text-foreground" style={{ fontFamily: "'DM Serif Display', serif" }}>
+            {isNew ? "Nova Etapa" : "Editar Etapa"}
+          </h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          {/* Label */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Nome da etapa</label>
+            <input
+              type="text"
+              value={draft.label}
+              onChange={e => setDraft({ ...draft, label: e.target.value })}
+              className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground"
+            />
+          </div>
+
+          {/* Status */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-2">Status</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["Concluído", "Em andamento", "Pendente", "Cancelado"] as StepStatus[]).map(s => (
+                <button
+                  key={s} type="button"
+                  onClick={() => setDraft({ ...draft, status: s, done: s === "Concluído" })}
+                  className={`py-2 px-3 rounded-lg text-xs font-medium border transition-colors flex items-center gap-2 ${
+                    draft.status === s
+                      ? STEP_STATUS_CONFIG[s].color
+                      : "bg-muted text-muted-foreground border-border hover:border-accent/50"
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${draft.status === s ? STEP_STATUS_CONFIG[s].dot : "bg-muted-foreground/40"}`} />
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Descrição</label>
+            <textarea
+              rows={3}
+              value={draft.description}
+              onChange={e => setDraft({ ...draft, description: e.target.value })}
+              placeholder="Descreva o escopo desta etapa..."
+              className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50 resize-none"
+            />
+          </div>
+
+          {/* Dates */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1.5 flex items-center gap-1">
+                <CalendarClock size={11} className="text-accent" /> Prazo
+              </label>
+              <input
+                type="date"
+                value={draft.deadline}
+                onChange={e => setDraft({ ...draft, deadline: e.target.value })}
+                className="w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1.5 flex items-center gap-1">
+                <CalendarCheck size={11} className="text-accent" /> Conclusão real
+              </label>
+              <input
+                type="date"
+                value={draft.completedAt}
+                onChange={e => setDraft({ ...draft, completedAt: e.target.value })}
+                className="w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+              />
+            </div>
+          </div>
+
+          {/* Photos */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-2">Fotos de evidência</label>
+            {draft.photos.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mb-2">
+                {draft.photos.map((url, i) => (
+                  <div key={i} className="relative rounded-lg overflow-hidden aspect-square bg-muted">
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setDraft({ ...draft, photos: draft.photos.filter((_, j) => j !== i) })}
+                      className="absolute top-1 right-1 bg-black/60 rounded-full p-0.5 text-white hover:bg-black/80 transition-colors"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              className="w-full py-2.5 border border-dashed border-border rounded-lg text-xs text-muted-foreground hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2"
+            >
+              <Upload size={13} /> Anexar fotos
+            </button>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-border flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2.5 bg-muted text-muted-foreground rounded-xl text-sm font-medium hover:bg-secondary transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={!draft.label.trim()}
+            onClick={() => { onSave(draft); onClose(); }}
+            className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/80 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+          >
+            {isNew ? "Criar etapa" : "Salvar alterações"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProjectDetail({ project, onBack }: { project: Project; onBack: () => void }) {
+  const [tab, setTab] = useState<DetailTab>("visao");
+  const [status, setStatus] = useState<ProjectStatus>(project.status);
+  const [milestones, setMilestones] = useState<Milestone[]>(project.milestones);
+  const [expenses, setExpenses] = useState<Expense[]>(project.expenses);
+  const [editingStep, setEditingStep] = useState<Milestone | null>(null);
+  const [creatingStep, setCreatingStep] = useState(false);
+  const [addingExpense, setAddingExpense] = useState(false);
+  const [expenseDraft, setExpenseDraft] = useState({ description: "", category: "Material", amount: "" });
+
+  const emptyStep: Milestone = {
+    label: "", done: false, date: "", status: "Pendente",
+    description: "", deadline: "", completedAt: "", photos: [],
+  };
+
+  const remaining = project.budgeted - project.spent;
+  const pieData = [
+    { name: "Executado", value: project.spent },
+    { name: "Restante", value: Math.max(0, remaining) },
+  ];
+  const PIE_COLORS = ["#D97706", "#EDF0F4"];
+
+  const monthlyData = [
+    { mes: "Fev", valor: 58000 },
+    { mes: "Mar", valor: 74000 },
+    { mes: "Abr", valor: 91000 },
+    { mes: "Mai", valor: 67000 },
+    { mes: "Jun", valor: 83000 },
+    { mes: "Jul", valor: 44000 },
+  ];
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header image */}
+      <div className="relative h-52 bg-muted overflow-hidden">
+        <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
+        <button
+          onClick={onBack}
+          className="absolute top-4 left-4 bg-white/20 backdrop-blur-sm rounded-full p-2 text-white hover:bg-white/30 transition-colors"
+        >
+          <ArrowLeft size={18} />
+        </button>
+        <div className="absolute bottom-4 left-4 right-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-white/70 text-xs mb-0.5">{project.location}</p>
+              <h2 className="text-white text-xl font-semibold leading-tight" style={{ fontFamily: "'DM Serif Display', serif" }}>
+                {project.name}
+              </h2>
+            </div>
+            <select
+              value={status}
+              onChange={e => setStatus(e.target.value as ProjectStatus)}
+              className="text-xs px-2 py-1.5 rounded-lg border-0 font-medium bg-white/90 text-foreground cursor-pointer"
+            >
+              {(["Em andamento", "Concluído", "Pausado", "Orçamento"] as ProjectStatus[]).map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Budget strip */}
+      <div className="bg-primary text-primary-foreground px-5 py-3 grid grid-cols-4 gap-1 text-sm">
+        <div>
+          <p className="text-[10px] text-primary-foreground/60 font-mono">Orçado</p>
+          <p className="font-semibold font-mono text-sm">{fmt(project.budgeted)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-primary-foreground/60 font-mono">Executado</p>
+          <p className="font-semibold font-mono text-sm text-amber-400">{fmt(project.spent)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-primary-foreground/60 font-mono">Despesas</p>
+          <p className="font-semibold font-mono text-sm text-orange-300">
+            {fmt(expenses.reduce((s, e) => s + e.amount, 0))}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] text-primary-foreground/60 font-mono">Saldo</p>
+          <p className={`font-semibold font-mono text-sm ${remaining >= 0 ? "text-green-400" : "text-red-400"}`}>
+            {fmt(remaining)}
+          </p>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-border bg-card overflow-x-auto scrollbar-hide">
+        {([
+          { id: "visao",    label: "Visão Geral", icon: <LayoutDashboard size={14} /> },
+          { id: "etapas",   label: "Etapas",      icon: <ListChecks size={14} /> },
+          { id: "despesas", label: "Despesas",     icon: <Receipt size={14} /> },
+          { id: "galeria",  label: "Galeria",      icon: <Image size={14} /> },
+        ] as { id: DetailTab; label: string; icon: React.ReactNode }[]).map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-colors border-b-2 ${
+              tab === t.id
+                ? "border-accent text-accent"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.icon}{t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="px-4 py-5 max-w-2xl mx-auto pb-24">
+        {/* TAB: Visão Geral */}
+        {tab === "visao" && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+              {/* Donut chart – CSS conic-gradient */}
+              <div className="bg-card border border-border rounded-xl p-4">
+                <p className="text-xs text-muted-foreground font-mono mb-3">Orçamento</p>
+                <div className="flex flex-col items-center gap-3">
+                  <div
+                    className="w-20 h-20 rounded-full flex items-center justify-center"
+                    style={{
+                      background: `conic-gradient(${PIE_COLORS[0]} 0% ${pieData[0].value / project.budgeted * 100}%, ${PIE_COLORS[1]} ${pieData[0].value / project.budgeted * 100}% 100%)`,
+                    }}
+                  >
+                    <div className="w-12 h-12 rounded-full bg-card flex items-center justify-center">
+                      <span className="text-xs font-mono font-semibold text-foreground">
+                        {Math.round(pieData[0].value / project.budgeted * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex justify-center gap-3">
+                    {pieData.map((d, i) => (
+                      <div key={d.name} className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: PIE_COLORS[i] }} />
+                        <span className="text-[10px] text-muted-foreground">{d.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress + milestones summary */}
+              <div className="bg-card border border-border rounded-xl p-4 flex flex-col justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground font-mono mb-1">Progresso</p>
+                  <p className="text-3xl font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>{project.progress}%</p>
+                  <ProgressBar
+                    value={project.progress}
+                    color={project.status === "Concluído" ? "bg-green-500" : "bg-accent"}
+                  />
+                </div>
+                <div className="mt-3">
+                  <p className="text-xs text-muted-foreground font-mono mb-1">Fase atual</p>
+                  <p className="text-xs font-medium text-foreground leading-snug">{project.phase}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Monthly bar chart */}
+            <div className="bg-card border border-border rounded-xl p-4">
+              <p className="text-xs text-muted-foreground font-mono mb-3">Gastos mensais (R$)</p>
+              <ResponsiveContainer width="100%" height={130}>
+                <BarChart data={monthlyData} barSize={20}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#EEECEA" />
+                  <XAxis dataKey="mes" tick={{ fontSize: 10, fill: "#7A7870" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "#7A7870" }} axisLine={false} tickLine={false} tickFormatter={v => `${v / 1000}k`} />
+                  <Tooltip formatter={(v: number) => [fmt(v), "Gasto"]} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                  <Bar dataKey="valor" fill="#D97706" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Dates */}
+            <div className="bg-card border border-border rounded-xl p-4">
+              <p className="text-xs text-muted-foreground font-mono mb-3">Datas</p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <CalendarClock size={14} className="text-accent" />
+                    <span>Fechamento do orçamento</span>
+                  </div>
+                  <span className="text-sm font-mono font-medium text-foreground">{project.quoteDeadline}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <CalendarDays size={14} className="text-accent" />
+                    <span>Início da obra</span>
+                  </div>
+                  <span className="text-sm font-mono font-medium text-foreground">{project.startDate}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <CalendarCheck size={14} className="text-accent" />
+                    <span>Entrega prevista</span>
+                  </div>
+                  <span className="text-sm font-mono font-medium text-foreground">{project.endDate}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Financeiro */}
+            {(() => {
+              const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+              const marginPlanned = project.contractValue - project.budgeted;
+              const marginReal = project.contractValue - totalExpenses;
+              const marginRealPct = totalExpenses > 0
+                ? (marginReal / project.contractValue) * 100
+                : (marginPlanned / project.contractValue) * 100;
+              const isHealthy = marginReal >= marginPlanned * 0.8;
+
+              const Row = ({ label, value, highlight }: { label: string; value: string; highlight?: "green" | "red" | "yellow" }) => (
+                <div className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
+                  <span className="text-sm text-muted-foreground">{label}</span>
+                  <span className={`text-sm font-mono font-semibold ${
+                    highlight === "green" ? "text-green-500" :
+                    highlight === "red"   ? "text-red-500" :
+                    highlight === "yellow"? "text-amber-400" :
+                    "text-foreground"
+                  }`}>{value}</span>
+                </div>
+              );
+
+              return (
+                <div className="bg-card border border-border rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs text-muted-foreground font-mono">Financeiro</p>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${
+                      isHealthy
+                        ? "bg-emerald-900/40 text-emerald-400 border-emerald-800"
+                        : "bg-red-900/30 text-red-400 border-red-900"
+                    }`}>
+                      {isHealthy ? "Margem saudável" : "Margem comprimida"}
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    <Row label="Valor do contrato" value={fmt(project.contractValue)} />
+                    <Row label="Custo orçado" value={fmt(project.budgeted)} />
+                    <Row label="Custo executado" value={fmt(totalExpenses > 0 ? totalExpenses : project.spent)} />
+                    <Row
+                      label="Margem prevista"
+                      value={`${fmt(marginPlanned)} · ${((marginPlanned / project.contractValue) * 100).toFixed(1)}%`}
+                      highlight="yellow"
+                    />
+                    <Row
+                      label="Margem real"
+                      value={`${fmt(marginReal)} · ${marginRealPct.toFixed(1)}%`}
+                      highlight={marginReal >= 0 ? "green" : "red"}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
+
+          </div>
+        )}
+
+        {/* TAB: Etapas */}
+        {tab === "etapas" && (
+          <div className="space-y-2">
+            {/* Summary bar */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex gap-2 flex-wrap">
+                {(["Concluído", "Em andamento", "Pendente", "Cancelado"] as StepStatus[]).map(s => {
+                  const count = milestones.filter(m => m.status === s).length;
+                  if (count === 0) return null;
+                  return (
+                    <span key={s} className={`text-[10px] px-2 py-1 rounded-full border font-medium ${STEP_STATUS_CONFIG[s].color}`}>
+                      {count} {s}
+                    </span>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={() => setCreatingStep(true)}
+                className="flex items-center gap-1.5 text-xs font-medium text-accent hover:text-amber-600 transition-colors shrink-0"
+              >
+                <Plus size={14} /> Nova etapa
+              </button>
+            </div>
+
+            {milestones.map((m, i) => {
+              const cfg = STEP_STATUS_CONFIG[m.status];
+              return (
+                <button
+                  key={i}
+                  onClick={() => setEditingStep(m)}
+                  className="w-full bg-card border border-border rounded-xl px-4 py-3.5 flex items-center gap-3 text-left hover:border-accent/40 transition-colors group"
+                >
+                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.dot}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium leading-snug ${m.status === "Cancelado" ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                      {m.label}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border ${cfg.color}`}>{cfg.label}</span>
+                      {m.deadline && (
+                        <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-0.5">
+                          <CalendarClock size={9} /> {m.deadline}
+                        </span>
+                      )}
+                      {m.completedAt && (
+                        <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-0.5">
+                          <CalendarCheck size={9} /> {m.completedAt}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {m.photos.length > 0 && (
+                    <div className="flex items-center gap-1 text-muted-foreground shrink-0">
+                      <Camera size={12} />
+                      <span className="text-[10px]">{m.photos.length}</span>
+                    </div>
+                  )}
+                  <ChevronRight size={14} className="text-muted-foreground shrink-0 group-hover:text-accent transition-colors" />
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* TAB: Despesas */}
+        {tab === "despesas" && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-muted-foreground font-mono">{expenses.length} lançamentos</span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-mono font-semibold text-foreground">
+                  {fmt(expenses.reduce((s, e) => s + e.amount, 0))}
+                </span>
+                <button
+                  onClick={() => setAddingExpense(true)}
+                  className="flex items-center gap-1 text-xs font-medium text-accent hover:text-amber-600 transition-colors"
+                >
+                  <Plus size={14} /> Adicionar
+                </button>
+              </div>
+            </div>
+            {expenses.map(exp => (
+              <div key={exp.id} className="bg-card border border-border rounded-xl px-4 py-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                  {exp.category === "Material" ? <Wrench size={14} className="text-muted-foreground" /> :
+                   exp.category === "Serviço" ? <HardHat size={14} className="text-muted-foreground" /> :
+                   <Receipt size={14} className="text-muted-foreground" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{exp.description}</p>
+                  <p className="text-xs text-muted-foreground">{exp.date} · {exp.category}</p>
+                </div>
+                <p className="text-sm font-mono font-semibold text-foreground shrink-0">{fmt(exp.amount)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* TAB: Galeria */}
+        {tab === "galeria" && (
+          <div className="space-y-4">
+            {project.photos.length === 0 ? (
+              <div className="bg-card border border-border rounded-xl p-10 flex flex-col items-center gap-3 text-center">
+                <Camera size={32} className="text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Nenhuma foto adicionada ainda</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {project.photos.map((ph, i) => (
+                  <div key={i} className="bg-muted rounded-xl overflow-hidden border border-border">
+                    <img src={ph.url} alt={ph.caption} className="w-full h-32 object-cover" />
+                    <div className="p-2">
+                      <p className="text-xs font-medium text-foreground leading-snug">{ph.caption}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{ph.date}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button className="w-full py-3 border-2 border-dashed border-border rounded-xl text-sm text-muted-foreground hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2">
+              <Upload size={16} /> Adicionar Fotos
+            </button>
+          </div>
+        )}
+      </div>
+
+
+      {/* Step edit modal */}
+      {editingStep && (
+        <StepModal
+          step={editingStep}
+          onClose={() => setEditingStep(null)}
+          onSave={updated => {
+            setMilestones(prev => prev.map(m => m.label === editingStep.label ? updated : m));
+          }}
+        />
+      )}
+
+      {/* Step create modal */}
+      {creatingStep && (
+        <StepModal
+          step={emptyStep}
+          isNew
+          onClose={() => setCreatingStep(false)}
+          onSave={newStep => {
+            setMilestones(prev => [...prev, newStep]);
+          }}
+        />
+      )}
+
+      {/* Add expense modal */}
+      {addingExpense && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setAddingExpense(false)} />
+          <div className="relative w-full max-w-lg bg-card border border-border rounded-t-2xl sm:rounded-2xl z-10">
+            <div className="flex justify-center pt-3 pb-1 sm:hidden">
+              <div className="w-10 h-1 rounded-full bg-border" />
+            </div>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <h3 className="text-base font-semibold text-foreground" style={{ fontFamily: "'DM Serif Display', serif" }}>
+                Nova Despesa
+              </h3>
+              <button onClick={() => setAddingExpense(false)} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1.5">Descrição</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Porcelanato 60×60 – área social"
+                  value={expenseDraft.description}
+                  onChange={e => setExpenseDraft({ ...expenseDraft, description: e.target.value })}
+                  className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-2">Categoria</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {["Material", "Serviço", "Outro"].map(cat => (
+                    <button
+                      key={cat} type="button"
+                      onClick={() => setExpenseDraft({ ...expenseDraft, category: cat })}
+                      className={`py-2 rounded-lg text-xs font-medium border transition-colors flex items-center justify-center gap-1.5 ${
+                        expenseDraft.category === cat
+                          ? "bg-accent text-accent-foreground border-accent"
+                          : "bg-muted text-muted-foreground border-border hover:border-accent/50"
+                      }`}
+                    >
+                      {cat === "Material" && <Wrench size={12} />}
+                      {cat === "Serviço" && <HardHat size={12} />}
+                      {cat === "Outro" && <Receipt size={12} />}
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1.5">Valor (R$)</label>
+                <div className="relative">
+                  <DollarSign size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Ex: 4.800"
+                    value={expenseDraft.amount}
+                    onChange={e => setExpenseDraft({ ...expenseDraft, amount: e.target.value })}
+                    className="w-full bg-input-background rounded-lg pl-9 pr-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50 font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-border flex gap-3">
+              <button
+                type="button"
+                onClick={() => setAddingExpense(false)}
+                className="flex-1 py-2.5 bg-muted text-muted-foreground rounded-xl text-sm font-medium hover:bg-secondary transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!expenseDraft.description.trim() || !expenseDraft.amount.trim()}
+                onClick={() => {
+                  const parsed = parseFloat(expenseDraft.amount.replace(/\./g, "").replace(",", "."));
+                  if (!expenseDraft.description.trim() || isNaN(parsed)) return;
+                  const now = new Date();
+                  const dateStr = now.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).replace(".", "");
+                  setExpenses(prev => [...prev, {
+                    id: Date.now(),
+                    date: dateStr,
+                    description: expenseDraft.description,
+                    category: expenseDraft.category,
+                    amount: parsed,
+                  }]);
+                  setExpenseDraft({ description: "", category: "Material", amount: "" });
+                  setAddingExpense(false);
+                }}
+                className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/80 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+              >
+                Registrar despesa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Screen C: New Quote ──────────────────────────────────────────────────────
+
+let nextItemId = 1;
+
+function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreated: (q: QuoteRecord) => void }) {
+  const [form, setForm] = useState({
+    clientName: "",
+    phone: "",
+    description: "",
+    contractValue: "",
+    urgency: "Normal",
+    quoteDeadline: "",
+    startDate: "",
+    endDate: "",
+  });
+  const [items, setItems] = useState<QuoteItem[]>([]);
+  const [newItem, setNewItem] = useState<Omit<QuoteItem, "id">>({ title: "", description: "", amount: "" });
+  const [addingItem, setAddingItem] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const totalValue = items.reduce((sum, it) => sum + (parseFloat(it.amount.replace(/\./g, "").replace(",", ".")) || 0), 0);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, "0");
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const yyyy = now.getFullYear();
+    const todayStr = `${dd}/${mm}/${yyyy}`;
+
+    const contractVal = parseFloat(form.contractValue.replace(/\./g, "").replace(",", ".")) || 0;
+
+    const newQuote: QuoteRecord = {
+      id: Date.now(),
+      clientName: form.clientName,
+      phone: form.phone,
+      description: form.description,
+      items,
+      budgeted: totalValue,
+      contractValue: contractVal,
+      urgency: form.urgency,
+      quoteDeadline: form.quoteDeadline,
+      startDate: form.startDate,
+      endDate: form.endDate,
+      status: "Solicitado",
+      milestones: [
+        {
+          label: "Avaliação do orçamento",
+          done: false,
+          date: "",
+          status: "Pendente",
+          description: "Avaliação técnica e comercial do orçamento solicitado.",
+          deadline: form.quoteDeadline,
+          completedAt: "",
+          photos: [],
+        },
+      ],
+      createdAt: todayStr,
+    };
+
+    onQuoteCreated(newQuote);
+    setSubmitted(true);
+  };
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 gap-5">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+          <CheckCircle size={32} className="text-green-600" />
+        </div>
+        <div className="text-center">
+          <h2 className="text-xl font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>Pré-orçamento gerado!</h2>
+          <p className="text-sm text-muted-foreground mt-1">Um link foi enviado para o cliente.</p>
+        </div>
+        <div className="w-full max-w-sm bg-card border border-border rounded-xl p-4 space-y-2">
+          <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Resumo</p>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Cliente</span>
+            <span className="font-medium">{form.clientName || "—"}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Tipo</span>
+            <span className="font-medium">Studio residencial</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Custo orçado</span>
+            <span className="font-medium font-mono">{totalValue > 0 ? fmt(totalValue) : "—"}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Valor do contrato</span>
+            <span className="font-medium font-mono">
+              {form.contractValue ? fmt(parseFloat(form.contractValue.replace(/\./g, "").replace(",", ".")) || 0) : "—"}
+            </span>
+          </div>
+          {form.contractValue && totalValue > 0 && (() => {
+            const contract = parseFloat(form.contractValue.replace(/\./g, "").replace(",", ".")) || 0;
+            const margin = contract - totalValue;
+            const pct = contract > 0 ? (margin / contract) * 100 : 0;
+            return (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Margem prevista</span>
+                <span className={`font-medium font-mono ${margin >= 0 ? "text-green-600" : "text-red-500"}`}>
+                  {fmt(margin)} ({pct.toFixed(1)}%)
+                </span>
+              </div>
+            );
+          })()}
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Orçamento válido até</span>
+            <span className="font-medium font-mono">{form.quoteDeadline || "—"}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Início / Entrega</span>
+            <span className="font-medium font-mono">{form.startDate || "—"} → {form.endDate || "—"}</span>
+          </div>
+        </div>
+        <div className="flex gap-3 w-full max-w-sm">
+          <button className="flex-1 py-3 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors">
+            Compartilhar link
+          </button>
+          <button onClick={onBack} className="flex-1 py-3 bg-secondary text-secondary-foreground rounded-xl text-sm font-medium hover:bg-muted transition-colors">
+            Ver Orçamentos
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="bg-primary text-primary-foreground px-5 py-4 flex items-center gap-3">
+        <button onClick={onBack} className="p-1 hover:bg-primary-foreground/10 rounded-lg transition-colors">
+          <ArrowLeft size={18} />
+        </button>
+        <div>
+          <p className="text-xs text-primary-foreground/60 font-mono uppercase tracking-wider">Captação</p>
+          <h1 className="text-base font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>Novo Orçamento</h1>
+        </div>
+      </header>
+
+      <form onSubmit={handleSubmit} className="max-w-lg mx-auto px-4 py-6 space-y-4 pb-24">
+        {/* Client info */}
+        <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+          <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Dados do cliente</p>
+          <div>
+            <label className="text-xs font-medium text-foreground block mb-1.5">Nome completo</label>
+            <div className="relative">
+              <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Ex: Carlos Pereira"
+                value={form.clientName}
+                onChange={e => setForm({ ...form, clientName: e.target.value })}
+                className="w-full bg-input-background rounded-lg pl-9 pr-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border placeholder:text-muted-foreground/50"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-foreground block mb-1.5">Telefone / WhatsApp</label>
+            <div className="relative">
+              <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="tel"
+                placeholder="(11) 99999-0000"
+                value={form.phone}
+                onChange={e => setForm({ ...form, phone: e.target.value })}
+                className="w-full bg-input-background rounded-lg pl-9 pr-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border placeholder:text-muted-foreground/50"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Quote items */}
+        <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Itens</p>
+            {items.length > 0 && (
+              <span className="text-xs font-mono font-semibold text-accent">{fmt(totalValue)}</span>
+            )}
+          </div>
+
+          {/* List of added items */}
+          {items.length > 0 && (
+            <div className="space-y-2">
+              {items.map(item => (
+                <div key={item.id} className="flex items-start gap-3 bg-muted rounded-lg px-3 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground leading-snug">{item.title}</p>
+                    {item.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{item.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-sm font-mono font-semibold text-foreground">
+                      {fmt(parseFloat(item.amount.replace(/\./g, "").replace(",", ".")) || 0)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setItems(prev => prev.filter(i => i.id !== item.id))}
+                      className="p-1 rounded hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add item form */}
+          {addingItem ? (
+            <div className="border border-accent/30 rounded-xl p-3 space-y-3 bg-accent/5">
+              <div>
+                <label className="text-xs font-medium text-foreground block mb-1">Título do item</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Retirada de piso"
+                  value={newItem.title}
+                  onChange={e => setNewItem({ ...newItem, title: e.target.value })}
+                  className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border placeholder:text-muted-foreground/50"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-foreground block mb-1">Descrição (opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Demolição e remoção completa do revestimento existente"
+                  value={newItem.description}
+                  onChange={e => setNewItem({ ...newItem, description: e.target.value })}
+                  className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border placeholder:text-muted-foreground/50"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-foreground block mb-1">Valor (R$)</label>
+                <div className="relative">
+                  <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Ex: 4.500"
+                    value={newItem.amount}
+                    onChange={e => setNewItem({ ...newItem, amount: e.target.value })}
+                    className="w-full bg-input-background rounded-lg pl-8 pr-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border placeholder:text-muted-foreground/50 font-mono"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => { setAddingItem(false); setNewItem({ title: "", description: "", amount: "" }); }}
+                  className="flex-1 py-2 bg-muted text-muted-foreground rounded-lg text-xs font-medium hover:bg-secondary transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={!newItem.title.trim() || !newItem.amount.trim()}
+                  onClick={() => {
+                    if (!newItem.title.trim() || !newItem.amount.trim()) return;
+                    setItems(prev => [...prev, { ...newItem, id: nextItemId++ }]);
+                    setNewItem({ title: "", description: "", amount: "" });
+                    setAddingItem(false);
+                  }}
+                  className="flex-1 py-2 bg-accent text-accent-foreground rounded-lg text-xs font-medium hover:bg-amber-600 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  Adicionar item
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAddingItem(true)}
+              className="w-full py-2.5 border border-dashed border-border rounded-xl text-xs text-muted-foreground hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2"
+            >
+              <PackagePlus size={14} /> Adicionar item
+            </button>
+          )}
+        </div>
+
+        {/* Project info */}
+        <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+          <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Projeto</p>
+          <div>
+            <label className="text-xs font-medium text-foreground block mb-1.5">Descrição do projeto</label>
+            <textarea
+              rows={3}
+              placeholder="Descreva o escopo da obra, metragem aproximada, localização..."
+              value={form.description}
+              onChange={e => setForm({ ...form, description: e.target.value })}
+              className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border placeholder:text-muted-foreground/50 resize-none"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-foreground block mb-1.5 flex items-center justify-between">
+              <span>Custo orçado (R$)</span>
+              <span className="text-[10px] text-muted-foreground normal-case font-normal">Soma dos itens</span>
+            </label>
+            <div className="relative">
+              <DollarSign size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <div className="w-full bg-muted rounded-lg pl-9 pr-4 py-2.5 text-sm border border-border font-mono text-foreground select-none cursor-default">
+                {totalValue > 0 ? fmt(totalValue) : <span className="text-muted-foreground/60">Nenhum item cadastrado</span>}
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-foreground block mb-1.5 flex items-center justify-between">
+              <span>Valor do contrato (R$)</span>
+              <span className="text-[10px] text-muted-foreground normal-case font-normal">O que será cobrado do cliente</span>
+            </label>
+            <div className="relative">
+              <DollarSign size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Ex: 104.000"
+                value={form.contractValue}
+                onChange={e => setForm({ ...form, contractValue: e.target.value })}
+                className="w-full bg-input-background rounded-lg pl-9 pr-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border placeholder:text-muted-foreground/50 font-mono"
+              />
+            </div>
+            {form.contractValue && totalValue > 0 && (() => {
+              const contract = parseFloat(form.contractValue.replace(/\./g, "").replace(",", ".")) || 0;
+              const margin = contract - totalValue;
+              const pct = contract > 0 ? (margin / contract) * 100 : 0;
+              return (
+                <p className={`text-xs mt-1.5 font-mono ${margin >= 0 ? "text-green-600" : "text-red-500"}`}>
+                  Margem prevista: {fmt(margin)} ({pct.toFixed(1)}%)
+                </p>
+              );
+            })()}
+          </div>
+          <div>
+            <label className="text-xs font-medium text-foreground block mb-1.5">Urgência</label>
+            <div className="grid grid-cols-3 gap-2">
+              {["Urgente", "Normal", "Planejado"].map(u => (
+                <button
+                  key={u} type="button"
+                  onClick={() => setForm({ ...form, urgency: u })}
+                  className={`py-2 rounded-lg text-xs font-medium border transition-colors ${
+                    form.urgency === u
+                      ? "bg-accent text-accent-foreground border-accent"
+                      : "bg-input-background text-muted-foreground border-border hover:border-accent"
+                  }`}
+                >{u}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Dates */}
+        <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+          <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Datas</p>
+          <div>
+            <label className="text-xs font-medium text-foreground block mb-1.5 flex items-center gap-1.5">
+              <CalendarClock size={12} className="text-accent" /> Fechamento do orçamento
+            </label>
+            <input
+              type="date"
+              value={form.quoteDeadline}
+              onChange={e => setForm({ ...form, quoteDeadline: e.target.value })}
+              className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-foreground block mb-1.5 flex items-center gap-1.5">
+                <CalendarDays size={12} className="text-accent" /> Início da obra
+              </label>
+              <input
+                type="date"
+                value={form.startDate}
+                onChange={e => setForm({ ...form, startDate: e.target.value })}
+                className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-foreground block mb-1.5 flex items-center gap-1.5">
+                <CalendarCheck size={12} className="text-accent" /> Entrega prevista
+              </label>
+              <input
+                type="date"
+                value={form.endDate}
+                onChange={e => setForm({ ...form, endDate: e.target.value })}
+                className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+              />
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          className="w-full py-3.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+        >
+          <FileText size={16} /> Gerar Pré-Orçamento
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// ─── Screen D: Quotes List ────────────────────────────────────────────────────
+
+const quoteStatusColors: Record<QuoteStatus, string> = {
+  "Solicitado": "bg-purple-100 text-purple-700",
+  "Em análise": "bg-blue-100 text-blue-700",
+  "Aprovado":   "bg-green-100 text-green-700",
+  "Rejeitado":  "bg-red-100 text-red-700",
+};
+
+const urgencyColors: Record<string, string> = {
+  "Urgente":   "bg-red-50 text-red-600",
+  "Normal":    "bg-gray-100 text-gray-600",
+  "Planejado": "bg-sky-50 text-sky-600",
+};
+
+function QuotesList({ quotes, onOpenQuote }: { quotes: QuoteRecord[]; onOpenQuote: (q: QuoteRecord) => void }) {
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="bg-primary text-primary-foreground px-6 py-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <ClipboardList size={22} />
+          <div>
+            <p className="text-xs text-primary-foreground/60 font-mono uppercase tracking-widest">Captação</p>
+            <h1 className="text-lg font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>Orçamentos</h1>
+          </div>
+        </div>
+        <span className="text-sm font-mono text-primary-foreground/70">{quotes.length} orçamentos</span>
+      </header>
+
+      <main className="max-w-2xl mx-auto px-4 py-6 pb-24">
+        {quotes.length === 0 ? (
+          <div className="bg-card border border-border rounded-xl p-12 flex flex-col items-center gap-3 text-center">
+            <ClipboardList size={32} className="text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Nenhum orçamento cadastrado ainda.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {quotes.map(q => (
+              <button
+                key={q.id}
+                onClick={() => onOpenQuote(q)}
+                className="w-full bg-card border border-border rounded-xl px-4 py-4 text-left hover:shadow-md hover:border-accent/30 transition-all"
+              >
+                {/* Row 1: name + status */}
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <span className="text-base font-semibold text-foreground leading-tight" style={{ fontFamily: "'DM Serif Display', serif" }}>
+                    {q.clientName}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${quoteStatusColors[q.status]}`}>
+                    {q.status}
+                  </span>
+                </div>
+                {/* Row 2: urgency + deadline */}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${urgencyColors[q.urgency] ?? "bg-gray-100 text-gray-600"}`}>
+                    {q.urgency}
+                  </span>
+                  <span className="text-[10px] font-mono text-muted-foreground">Válido até {q.quoteDeadline || "—"}</span>
+                </div>
+                {/* Row 3: financial */}
+                <div className="flex items-center gap-4 mb-2">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground font-mono">Custo orçado</p>
+                    <p className="text-sm font-mono font-semibold text-foreground">{fmt(q.budgeted)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground font-mono">Contrato</p>
+                    <p className="text-sm font-mono font-semibold text-accent">{fmt(q.contractValue)}</p>
+                  </div>
+                </div>
+                {/* Row 4: created at */}
+                <p className="text-[10px] text-muted-foreground font-mono">Criado em {q.createdAt}</p>
+              </button>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+// ─── Screen E: Quote Detail ───────────────────────────────────────────────────
+
+function QuoteDetail({
+  quote,
+  onBack,
+  onUpdateQuote,
+  onGenerateProject,
+}: {
+  quote: QuoteRecord;
+  onBack: () => void;
+  onUpdateQuote: (q: QuoteRecord) => void;
+  onGenerateProject: (q: QuoteRecord) => void;
+}) {
+  const margin = quote.contractValue > 0
+    ? ((quote.contractValue - quote.budgeted) / quote.contractValue) * 100
+    : 0;
+
+  const handleStatusChange = (s: QuoteStatus) => {
+    onUpdateQuote({ ...quote, status: s });
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="bg-primary text-primary-foreground px-5 py-4 flex items-center gap-3">
+        <button onClick={onBack} className="p-1 hover:bg-primary-foreground/10 rounded-lg transition-colors">
+          <ArrowLeft size={18} />
+        </button>
+        <div>
+          <p className="text-xs text-primary-foreground/60 font-mono uppercase tracking-wider">Orçamento</p>
+          <h1 className="text-base font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>{quote.clientName}</h1>
+        </div>
+      </div>
+
+      {/* Financial strip */}
+      <div className="bg-primary/90 text-primary-foreground px-5 py-3 grid grid-cols-4 gap-1 text-sm border-t border-primary-foreground/10">
+        <div>
+          <p className="text-[10px] text-primary-foreground/60 font-mono">Custo orçado</p>
+          <p className="font-semibold font-mono text-sm">{fmt(quote.budgeted)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-primary-foreground/60 font-mono">Contrato</p>
+          <p className="font-semibold font-mono text-sm text-amber-400">{fmt(quote.contractValue)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-primary-foreground/60 font-mono">Margem</p>
+          <p className="font-semibold font-mono text-sm text-green-400">{margin.toFixed(1)}%</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] text-primary-foreground/60 font-mono">Urgência</p>
+          <p className="font-semibold text-sm">{quote.urgency}</p>
+        </div>
+      </div>
+
+      <div className="max-w-2xl mx-auto px-4 py-5 pb-24 space-y-5">
+        {/* Status section */}
+        <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+          <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Status</p>
+          <div className="grid grid-cols-2 gap-2">
+            {(["Solicitado", "Em análise", "Aprovado", "Rejeitado"] as QuoteStatus[]).map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => handleStatusChange(s)}
+                className={`py-2 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                  quote.status === s
+                    ? quoteStatusColors[s] + " border-current"
+                    : "bg-muted text-muted-foreground border-border hover:border-accent/50"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Items section */}
+        <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+          <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Itens do orçamento</p>
+          {quote.items.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum item cadastrado.</p>
+          ) : (
+            <div className="space-y-2">
+              {quote.items.map(item => (
+                <div key={item.id} className="flex items-center justify-between bg-muted rounded-lg px-3 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">{item.title}</p>
+                    {item.description && <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>}
+                  </div>
+                  <span className="text-sm font-mono font-semibold text-foreground shrink-0 ml-3">
+                    {fmt(parseFloat(item.amount.replace(/\./g, "").replace(",", ".")) || 0)}
+                  </span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between pt-2 border-t border-border">
+                <span className="text-sm font-medium text-muted-foreground">Total orçado</span>
+                <span className="text-sm font-mono font-semibold text-foreground">{fmt(quote.budgeted)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Milestones section */}
+        <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+          <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Etapas</p>
+          {quote.milestones.map((m, i) => {
+            const cfg = STEP_STATUS_CONFIG[m.status];
+            return (
+              <div key={i} className="bg-muted rounded-xl px-4 py-3 flex items-center gap-3">
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.dot}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground leading-snug">{m.label}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${cfg.color}`}>{cfg.label}</span>
+                    {m.deadline && (
+                      <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-0.5">
+                        <CalendarClock size={9} /> {m.deadline}
+                      </span>
+                    )}
+                    {m.completedAt && (
+                      <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-0.5">
+                        <CalendarCheck size={9} /> {m.completedAt}
+                      </span>
+                    )}
+                  </div>
+                  {m.description && <p className="text-xs text-muted-foreground mt-1 leading-snug">{m.description}</p>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Dates section */}
+        <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+          <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Datas</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CalendarClock size={14} className="text-accent" />
+              <span>Fechamento do orçamento</span>
+            </div>
+            <span className="text-sm font-mono font-medium text-foreground">{quote.quoteDeadline || "—"}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CalendarDays size={14} className="text-accent" />
+              <span>Início da obra</span>
+            </div>
+            <span className="text-sm font-mono font-medium text-foreground">{quote.startDate || "—"}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CalendarCheck size={14} className="text-accent" />
+              <span>Entrega prevista</span>
+            </div>
+            <span className="text-sm font-mono font-medium text-foreground">{quote.endDate || "—"}</span>
+          </div>
+        </div>
+
+        {/* Generate project button */}
+        {quote.status === "Aprovado" && (
+          <button
+            onClick={() => onGenerateProject(quote)}
+            className="w-full py-3.5 bg-accent text-accent-foreground rounded-xl font-medium hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 text-sm"
+          >
+            <HardHat size={16} /> Gerar Obra
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Bottom Navigation ────────────────────────────────────────────────────────
+
+function BottomNav({ active, onChange }: { active: Screen; onChange: (s: Screen) => void }) {
+  const items: { id: Screen; label: string; icon: React.ReactNode }[] = [
+    { id: "dashboard", label: "Obras", icon: <Home size={20} /> },
+    { id: "quotes", label: "Orçamentos", icon: <ClipboardList size={20} /> },
+    { id: "newQuote", label: "Novo Orçamento", icon: <FilePlus size={20} /> },
+  ];
+
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border flex z-40">
+      {items.map(item => (
+        <button
+          key={item.id}
+          onClick={() => onChange(item.id)}
+          className={`flex-1 flex flex-col items-center gap-1 py-2.5 transition-colors ${
+            active === item.id ? "text-accent" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {item.icon}
+          <span className="text-[10px] font-medium">{item.label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+// ─── App Root ─────────────────────────────────────────────────────────────────
+
+export default function App() {
+  const [screen, setScreen] = useState<Screen>("dashboard");
+  const [selectedProject, setSelectedProject] = useState<Project>(PROJECTS[0]);
+  const [projects, setProjects] = useState<Project[]>(PROJECTS);
+  const [quotes, setQuotes] = useState<QuoteRecord[]>(MOCK_QUOTES);
+  const [selectedQuote, setSelectedQuote] = useState<QuoteRecord | null>(null);
+
+  const handleOpenProject = (p: Project) => {
+    setSelectedProject(p);
+    setScreen("detail");
+  };
+
+  const handleOpenQuote = (q: QuoteRecord) => {
+    setSelectedQuote(q);
+    setScreen("quoteDetail");
+  };
+
+  const handleUpdateQuote = (updated: QuoteRecord) => {
+    setQuotes(prev => prev.map(q => q.id === updated.id ? updated : q));
+    setSelectedQuote(updated);
+  };
+
+  const handleGenerateProject = (q: QuoteRecord) => {
+    const lastName = q.clientName.split(" ").pop() ?? q.clientName;
+    const newProject: Project = {
+      id: Date.now(),
+      name: `Studio ${lastName}`,
+      client: q.clientName,
+      status: "Em andamento",
+      progress: 0,
+      budgeted: q.budgeted,
+      contractValue: q.contractValue,
+      spent: 0,
+      expenses: [],
+      milestones: q.milestones,
+      photos: [],
+      phase: "Iniciando",
+      location: "–",
+      image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&h=500&fit=crop&auto=format",
+      startDate: q.startDate || "–",
+      endDate: q.endDate || "–",
+      quoteDeadline: q.quoteDeadline,
+    };
+    setProjects(prev => [...prev, newProject]);
+    setScreen("dashboard");
+  };
+
+  const handleQuoteCreated = (q: QuoteRecord) => {
+    setQuotes(prev => [q, ...prev]);
+  };
+
+  const showNav = screen === "dashboard" || screen === "quotes" || screen === "newQuote";
+
+  return (
+    <div className="w-full min-h-screen bg-background" style={{ fontFamily: "'Inter', sans-serif" }}>
+      {screen === "dashboard" && (
+        <Dashboard
+          projects={projects}
+          onOpenProject={handleOpenProject}
+          onNewProject={() => setScreen("newQuote")}
+        />
+      )}
+      {screen === "detail" && (
+        <ProjectDetail project={selectedProject} onBack={() => setScreen("dashboard")} />
+      )}
+      {screen === "newQuote" && (
+        <NewQuote
+          onBack={() => setScreen("quotes")}
+          onQuoteCreated={handleQuoteCreated}
+        />
+      )}
+      {screen === "quotes" && (
+        <QuotesList quotes={quotes} onOpenQuote={handleOpenQuote} />
+      )}
+      {screen === "quoteDetail" && selectedQuote && (
+        <QuoteDetail
+          quote={selectedQuote}
+          onBack={() => setScreen("quotes")}
+          onUpdateQuote={handleUpdateQuote}
+          onGenerateProject={handleGenerateProject}
+        />
+      )}
+      {showNav && (
+        <BottomNav active={screen} onChange={setScreen} />
+      )}
+    </div>
+  );
+}
