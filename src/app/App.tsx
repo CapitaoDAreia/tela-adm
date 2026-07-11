@@ -479,8 +479,24 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
 }) {
   const [draft, setDraft] = useState<Milestone>({ ...step });
   const [workerNote, setWorkerNote] = useState("");
+  const [pendingStatus, setPendingStatus] = useState<StepStatus | null>(null);
 
-  const canComplete = draft.photos.length > 0 || draft.status !== "Concluído";
+  const handleStatusRequest = (s: StepStatus) => {
+    if (s === draft.status) return;
+    setPendingStatus(s);
+  };
+
+  const confirmStatus = () => {
+    if (!pendingStatus) return;
+    const today = new Date().toISOString().split("T")[0];
+    setDraft(prev => ({
+      ...prev,
+      status: pendingStatus,
+      done: pendingStatus === "Concluído",
+      completedAt: pendingStatus === "Concluído" ? today : "",
+    }));
+    setPendingStatus(null);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -516,7 +532,34 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
             </div>
           )}
 
-          {/* Descrição do escopo (se novo ou não preenchido) */}
+          {/* Prazo — definido no planejamento, fora das seções */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5 flex items-center gap-1.5">
+              <CalendarClock size={11} className="text-accent" /> Prazo previsto
+            </label>
+            <input
+              type="date"
+              value={draft.deadline}
+              onChange={e => setDraft({ ...draft, deadline: e.target.value })}
+              className="w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+            />
+          </div>
+
+          {/* Conclusão real — chip read-only, preenchido automaticamente ao marcar Concluído */}
+          {draft.status === "Concluído" && draft.completedAt && (
+            <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-900/20 border border-emerald-800/40 rounded-lg">
+              <CalendarCheck size={13} className="text-emerald-400 shrink-0" />
+              <span className="text-xs text-emerald-400 font-mono">
+                Concluído em: {
+                  draft.completedAt.includes("-")
+                    ? new Date(draft.completedAt + "T12:00:00").toLocaleDateString("pt-BR")
+                    : draft.completedAt
+                }
+              </span>
+            </div>
+          )}
+
+          {/* Descrição do escopo */}
           {(isNew || draft.description) && (
             <div>
               <label className="text-xs font-medium text-muted-foreground block mb-1.5">Descrição do escopo</label>
@@ -587,50 +630,54 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
               <ShieldCheck size={13} className="text-primary" />
               <span className="text-[11px] font-semibold text-primary/70 uppercase tracking-wider">Aprovação do supervisor</span>
             </div>
-            <div className="px-4 py-3 space-y-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-2">Status</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["Concluído", "Em andamento", "Pendente", "Cancelado"] as StepStatus[]).map(s => (
+            <div className="px-4 py-3">
+              {pendingStatus ? (
+                <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 space-y-3">
+                  <p className="text-sm text-center text-foreground">
+                    Deseja alterar o status para:
+                  </p>
+                  <div className={`flex items-center justify-center gap-2 py-2 px-4 rounded-lg border text-sm font-medium ${STEP_STATUS_CONFIG[pendingStatus].color}`}>
+                    <span className={`w-2.5 h-2.5 rounded-full ${STEP_STATUS_CONFIG[pendingStatus].dot}`} />
+                    {pendingStatus}
+                  </div>
+                  <div className="flex gap-2">
                     <button
-                      key={s} type="button"
-                      onClick={() => setDraft({ ...draft, status: s, done: s === "Concluído" })}
-                      className={`py-2 px-3 rounded-lg text-xs font-medium border transition-colors flex items-center gap-2 ${
-                        draft.status === s
-                          ? STEP_STATUS_CONFIG[s].color
-                          : "bg-muted text-muted-foreground border-border hover:border-accent/50"
-                      }`}
+                      type="button"
+                      onClick={() => setPendingStatus(null)}
+                      className="flex-1 py-2 bg-muted text-muted-foreground rounded-lg text-xs font-medium hover:bg-secondary transition-colors"
                     >
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${draft.status === s ? STEP_STATUS_CONFIG[s].dot : "bg-muted-foreground/40"}`} />
-                      {s}
+                      Cancelar
                     </button>
-                  ))}
+                    <button
+                      type="button"
+                      onClick={confirmStatus}
+                      className="flex-1 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/80 transition-colors"
+                    >
+                      Confirmar
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+              ) : (
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground block mb-1.5 flex items-center gap-1">
-                    <CalendarClock size={11} className="text-accent" /> Prazo
-                  </label>
-                  <input
-                    type="date"
-                    value={draft.deadline}
-                    onChange={e => setDraft({ ...draft, deadline: e.target.value })}
-                    className="w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
-                  />
+                  <label className="text-xs font-medium text-muted-foreground block mb-2">Status</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["Concluído", "Em andamento", "Pendente", "Cancelado"] as StepStatus[]).map(s => (
+                      <button
+                        key={s} type="button"
+                        onClick={() => handleStatusRequest(s)}
+                        className={`py-2 px-3 rounded-lg text-xs font-medium border transition-colors flex items-center gap-2 ${
+                          draft.status === s
+                            ? STEP_STATUS_CONFIG[s].color
+                            : "bg-muted text-muted-foreground border-border hover:border-accent/50"
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${draft.status === s ? STEP_STATUS_CONFIG[s].dot : "bg-muted-foreground/40"}`} />
+                        {s}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground block mb-1.5 flex items-center gap-1">
-                    <CalendarCheck size={11} className="text-accent" /> Conclusão real
-                  </label>
-                  <input
-                    type="date"
-                    value={draft.completedAt}
-                    onChange={e => setDraft({ ...draft, completedAt: e.target.value })}
-                    className="w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
-                  />
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
