@@ -1420,13 +1420,17 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
             type="button"
             onClick={() => {
               const contractVal = parseFloat(form.contractValue.replace(/\./g, "").replace(",", ".")) || 0;
-              const itemsHtml = items.map(it => `
-                <tr>
+              const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+              const itemsHtml = items.map(it => {
+                const amt = parseFloat(String(it.amount).replace(/\./g, "").replace(",", ".")) || 0;
+                return `<tr>
                   <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0">
                     <div style="font-size:13px;font-weight:600;color:#1a1a1a">${it.title}</div>
                     ${it.description ? `<div style="font-size:11px;color:#888;margin-top:2px">${it.description}</div>` : ""}
                   </td>
-                </tr>`).join("");
+                  <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;text-align:right;white-space:nowrap;font-size:13px;font-weight:600;color:#1a1a1a">${amt > 0 ? fmtBRL(amt) : "—"}</td>
+                </tr>`;
+              }).join("");
               const startStr = form.startDate ? new Date(form.startDate + "T12:00:00").toLocaleDateString("pt-BR") : "—";
               const endStr = form.endDate ? new Date(form.endDate + "T12:00:00").toLocaleDateString("pt-BR") : "—";
               const win = window.open("", "_blank");
