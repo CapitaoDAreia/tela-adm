@@ -817,14 +817,23 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
   ];
   const PIE_COLORS = ["#D97706", "#EDF0F4"];
 
-  const monthlyData = [
-    { mes: "Fev", valor: 58000 },
-    { mes: "Mar", valor: 74000 },
-    { mes: "Abr", valor: 91000 },
-    { mes: "Mai", valor: 67000 },
-    { mes: "Jun", valor: 83000 },
-    { mes: "Jul", valor: 44000 },
-  ];
+  const PT_MONTH_ORDER: Record<string, number> = {
+    Jan: 0, Fev: 1, Mar: 2, Abr: 3, Mai: 4, Jun: 5,
+    Jul: 6, Ago: 7, Set: 8, Out: 9, Nov: 10, Dez: 11,
+  };
+  const monthlyData = (() => {
+    const grouped: Record<string, { mes: string; valor: number; sort: number }> = {};
+    expenses.forEach(exp => {
+      // date format: "DD Mon YYYY" e.g. "02 Jul 2025"
+      const parts = exp.date.split(" ");
+      if (parts.length < 3) return;
+      const [, mon, year] = parts;
+      const key = `${year}-${PT_MONTH_ORDER[mon] ?? 0}`;
+      if (!grouped[key]) grouped[key] = { mes: mon, valor: 0, sort: parseInt(year) * 100 + (PT_MONTH_ORDER[mon] ?? 0) };
+      grouped[key].valor += exp.amount;
+    });
+    return Object.values(grouped).sort((a, b) => a.sort - b.sort).map(({ mes, valor }) => ({ mes, valor }));
+  })();
 
   return (
     <div className="min-h-screen bg-background">
