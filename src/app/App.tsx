@@ -1786,7 +1786,7 @@ function QuotesList({ quotes, onOpenQuote }: { quotes: QuoteRecord[]; onOpenQuot
                 className="w-full bg-card border border-border rounded-xl px-4 py-4 text-left hover:shadow-md hover:border-accent/30 transition-all"
               >
                 {/* Row 1: name + status */}
-                <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="flex items-center justify-between gap-2 mb-1">
                   <span className="text-base font-semibold text-foreground leading-tight" style={{ fontFamily: "'DM Serif Display', serif" }}>
                     {q.clientName}
                   </span>
@@ -1794,23 +1794,23 @@ function QuotesList({ quotes, onOpenQuote }: { quotes: QuoteRecord[]; onOpenQuot
                     {q.status}
                   </span>
                 </div>
-                {/* Row 2: urgency + created */}
-                <div className="flex items-center gap-2 mb-2">
+                {/* Row 2: description */}
+                {q.description && (
+                  <p className="text-xs text-muted-foreground mb-2 leading-snug line-clamp-1">{q.description}</p>
+                )}
+                {/* Row 3: urgency + items + created */}
+                <div className="flex items-center gap-2 mb-3">
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${urgencyColors[q.urgency] ?? "bg-gray-100 text-gray-600"}`}>
                     {q.urgency}
                   </span>
-                  <span className="text-[10px] font-mono text-muted-foreground">Criado em {q.createdAt}</span>
+                  <span className="text-[10px] text-muted-foreground">{q.items.length} {q.items.length === 1 ? "item" : "itens"}</span>
+                  <span className="text-muted-foreground/40 text-[10px]">·</span>
+                  <span className="text-[10px] font-mono text-muted-foreground">{q.createdAt}</span>
                 </div>
-                {/* Row 3: financial */}
-                <div className="flex items-center gap-4 mb-2">
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-mono">Custo orçado</p>
-                    <p className="text-sm font-mono font-semibold text-foreground">{fmt(q.budgeted)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-mono">Contrato</p>
-                    <p className="text-sm font-mono font-semibold text-accent">{fmt(q.contractValue)}</p>
-                  </div>
+                {/* Row 4: financial — contrato em destaque, custo orçado secundário */}
+                <div className="flex items-baseline gap-3">
+                  <span className="text-base font-mono font-bold text-accent">{fmt(q.contractValue)}</span>
+                  <span className="text-xs font-mono text-muted-foreground">orçado {fmt(q.budgeted)}</span>
                 </div>
               </button>
             ))}
