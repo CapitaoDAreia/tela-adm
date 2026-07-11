@@ -1757,7 +1757,31 @@ const urgencyColors: Record<string, string> = {
   "Planejado": "bg-sky-50 text-sky-600",
 };
 
+const QUOTE_STATUS_FILTERS = ["Todos", "Solicitado", "Em análise", "Aprovado", "Cancelado"] as const;
+type QuoteStatusFilter = (typeof QUOTE_STATUS_FILTERS)[number];
+const QUOTE_SORT_OPTIONS = [
+  { value: "recent", label: "Mais recente" },
+  { value: "value", label: "Maior valor" },
+] as const;
+type QuoteSortOption = (typeof QUOTE_SORT_OPTIONS)[number]["value"];
+
 function QuotesList({ quotes, onOpenQuote }: { quotes: QuoteRecord[]; onOpenQuote: (q: QuoteRecord) => void }) {
+  const [filterStatus, setFilterStatus] = useState<QuoteStatusFilter>("Todos");
+  const [sortBy, setSortBy] = useState<QuoteSortOption>("recent");
+
+  const filtered = quotes
+    .filter(q => filterStatus === "Todos" || q.status === filterStatus)
+    .sort((a, b) => {
+      if (sortBy === "value") return b.contractValue - a.contractValue;
+      // "recent" — sort by createdAt (dd/mm/yyyy HH:MM)
+      const parse = (s: string) => {
+        const [datePart, timePart] = s.split(" ");
+        const [d, m, y] = datePart.split("/");
+        return new Date(`${y}-${m}-${d}T${timePart ?? "00:00"}`).getTime();
+      };
+      return parse(b.createdAt) - parse(a.createdAt);
+    });
+
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-primary text-primary-foreground px-6 py-5 flex items-center justify-between">
@@ -1768,18 +1792,48 @@ function QuotesList({ quotes, onOpenQuote }: { quotes: QuoteRecord[]; onOpenQuot
             <h1 className="text-lg font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>Orçamentos</h1>
           </div>
         </div>
-        <span className="text-sm font-mono text-primary-foreground/70">{quotes.length} orçamentos</span>
+        <span className="text-sm font-mono text-primary-foreground/70">{filtered.length} de {quotes.length}</span>
       </header>
 
+      {/* Filter bar */}
+      <div className="bg-card border-b border-border px-4 py-3 flex items-center gap-2">
+        <div className="flex gap-1.5 flex-1 overflow-x-auto no-scrollbar">
+          {QUOTE_STATUS_FILTERS.map(s => (
+            <button
+              key={s}
+              onClick={() => setFilterStatus(s)}
+              className={`shrink-0 text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+                filterStatus === s
+                  ? "bg-accent text-accent-foreground"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+        <select
+          value={sortBy}
+          onChange={e => setSortBy(e.target.value as QuoteSortOption)}
+          className="shrink-0 text-xs bg-muted text-muted-foreground border-none rounded-lg px-2 py-1 font-medium cursor-pointer focus:outline-none"
+        >
+          {QUOTE_SORT_OPTIONS.map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      </div>
+
       <main className="max-w-2xl mx-auto px-4 py-6 pb-24">
-        {quotes.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="bg-card border border-border rounded-xl p-12 flex flex-col items-center gap-3 text-center">
             <ClipboardList size={32} className="text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Nenhum orçamento cadastrado ainda.</p>
+            <p className="text-sm text-muted-foreground">
+              {quotes.length === 0 ? "Nenhum orçamento cadastrado ainda." : "Nenhum orçamento com esse filtro."}
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {quotes.map(q => (
+            {filtered.map(q => (
               <button
                 key={q.id}
                 onClick={() => onOpenQuote(q)}
