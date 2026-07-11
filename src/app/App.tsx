@@ -453,14 +453,23 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
                 </div>
               </div>
               <div className="px-4 py-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-muted-foreground">{project.phase}</span>
-                  <span className="text-xs font-mono font-medium text-foreground">{project.progress}%</span>
-                </div>
-                <ProgressBar
-                  value={project.progress}
-                  color={project.status === "Concluído" ? "bg-green-500" : project.status === "Pausado" ? "bg-yellow-400" : "bg-accent"}
-                />
+                {(() => {
+                  const prog = project.milestones.length > 0
+                    ? Math.round(project.milestones.filter(m => m.status === "Concluído").length / project.milestones.length * 100)
+                    : project.progress;
+                  return (
+                    <>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-muted-foreground">{project.phase}</span>
+                        <span className="text-xs font-mono font-medium text-foreground">{prog}%</span>
+                      </div>
+                      <ProgressBar
+                        value={prog}
+                        color={project.status === "Concluído" ? "bg-green-500" : project.status === "Pausado" ? "bg-yellow-400" : "bg-accent"}
+                      />
+                    </>
+                  );
+                })()}
                 <div className="flex items-center justify-between mt-2.5">
                   <span className="text-xs text-muted-foreground">{project.client}</span>
                   <span className="text-xs font-mono text-muted-foreground">
@@ -794,11 +803,26 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
   );
 }
 
-function ProjectDetail({ project, onBack }: { project: Project; onBack: () => void }) {
+function ProjectDetail({ project, onBack, onUpdateProject }: {
+  project: Project;
+  onBack: () => void;
+  onUpdateProject?: (p: Project) => void;
+}) {
   const [tab, setTab] = useState<DetailTab>("visao");
   const [status, setStatus] = useState<ProjectStatus>(project.status);
   const [milestones, setMilestones] = useState<Milestone[]>(project.milestones);
   const [expenses, setExpenses] = useState<Expense[]>(project.expenses);
+
+  const computedProgress = milestones.length > 0
+    ? Math.round(milestones.filter(m => m.status === "Concluído").length / milestones.length * 100)
+    : project.progress;
+
+  const propagate = (newMilestones: Milestone[]) => {
+    const progress = newMilestones.length > 0
+      ? Math.round(newMilestones.filter(m => m.status === "Concluído").length / newMilestones.length * 100)
+      : project.progress;
+    onUpdateProject?.({ ...project, milestones: newMilestones, expenses, status, progress });
+  };
   const [editingStep, setEditingStep] = useState<Milestone | null>(null);
   const [creatingStep, setCreatingStep] = useState(false);
   const [addingExpense, setAddingExpense] = useState(false);
@@ -957,9 +981,9 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
               <div className="bg-card border border-border rounded-xl p-4 flex flex-col justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground font-mono mb-1">Progresso</p>
-                  <p className="text-3xl font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>{project.progress}%</p>
+                  <p className="text-3xl font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>{computedProgress}%</p>
                   <ProgressBar
-                    value={project.progress}
+                    value={computedProgress}
                     color={project.status === "Concluído" ? "bg-green-500" : "bg-accent"}
                   />
                 </div>
@@ -1199,7 +1223,7 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
       {/* Report modal */}
       {showReport && (
         <ReportModal
-          project={{ ...project, milestones, expenses }}
+          project={{ ...project, milestones, expenses, progress: computedProgress }}
           onClose={() => setShowReport(false)}
         />
       )}
@@ -1210,7 +1234,9 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
           step={editingStep}
           onClose={() => setEditingStep(null)}
           onSave={updated => {
-            setMilestones(prev => prev.map(m => m.label === editingStep.label ? updated : m));
+            const next = milestones.map(m => m.label === editingStep.label ? updated : m);
+            setMilestones(next);
+            propagate(next);
           }}
         />
       )}
@@ -1222,7 +1248,9 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
           isNew
           onClose={() => setCreatingStep(false)}
           onSave={newStep => {
-            setMilestones(prev => [...prev, newStep]);
+            const next = [...milestones, newStep];
+            setMilestones(next);
+            propagate(next);
           }}
         />
       )}
@@ -2554,7 +2582,14 @@ export default function App() {
         />
       )}
       {screen === "detail" && (
-        <ProjectDetail project={selectedProject} onBack={() => setScreen("dashboard")} />
+        <ProjectDetail
+          project={selectedProject}
+          onBack={() => setScreen("dashboard")}
+          onUpdateProject={updated => {
+            setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
+            setSelectedProject(updated);
+          }}
+        />
       )}
       {screen === "newQuote" && (
         <NewQuote
