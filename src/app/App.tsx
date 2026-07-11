@@ -33,7 +33,7 @@ interface QuoteRecord {
   budgeted: number;
   contractValue: number;
   urgency: string;
-  quoteDeadline: string;
+  quoteDeadline?: string;
   startDate: string;
   endDate: string;
   status: QuoteStatus;
@@ -232,7 +232,7 @@ const MOCK_QUOTES: QuoteRecord[] = [
     milestones: [
       { label: "Avaliação do orçamento", done: false, date: "Jul 2025", status: "Em andamento", description: "Análise técnica e comercial do escopo solicitado.", deadline: "25/07/2025", completedAt: "", photos: [] },
     ],
-    createdAt: "08/07/2025",
+    createdAt: "08/07/2025 09:30",
   },
   {
     id: 102,
@@ -255,7 +255,7 @@ const MOCK_QUOTES: QuoteRecord[] = [
     milestones: [
       { label: "Avaliação do orçamento", done: false, date: "Jul 2025", status: "Pendente", description: "", deadline: "15/07/2025", completedAt: "", photos: [] },
     ],
-    createdAt: "07/07/2025",
+    createdAt: "07/07/2025 14:15",
   },
   {
     id: 103,
@@ -279,7 +279,7 @@ const MOCK_QUOTES: QuoteRecord[] = [
     milestones: [
       { label: "Avaliação do orçamento", done: true, date: "Jun 2025", status: "Concluído", description: "Escopo aprovado pela cliente após ajustes.", deadline: "30/06/2025", completedAt: "28/06/2025", photos: [] },
     ],
-    createdAt: "20/06/2025",
+    createdAt: "20/06/2025 11:00",
   },
 ];
 
@@ -1295,7 +1295,6 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
     description: "",
     contractValue: "",
     urgency: "Normal",
-    quoteDeadline: "",
     startDate: "",
     endDate: "",
   });
@@ -1303,16 +1302,26 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
   const [newItem, setNewItem] = useState<Omit<QuoteItem, "id">>({ title: "", description: "", amount: "" });
   const [addingItem, setAddingItem] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submittedAt, setSubmittedAt] = useState("");
+  const [dateError, setDateError] = useState("");
 
   const totalValue = items.reduce((sum, it) => sum + (parseFloat(it.amount.replace(/\./g, "").replace(",", ".")) || 0), 0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (form.startDate && form.endDate && form.startDate >= form.endDate) {
+      setDateError("A data de início deve ser anterior à entrega prevista.");
+      return;
+    }
+    setDateError("");
+
     const now = new Date();
     const dd = String(now.getDate()).padStart(2, "0");
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const yyyy = now.getFullYear();
-    const todayStr = `${dd}/${mm}/${yyyy}`;
+    const hh = String(now.getHours()).padStart(2, "0");
+    const min = String(now.getMinutes()).padStart(2, "0");
+    const createdAtStr = `${dd}/${mm}/${yyyy} ${hh}:${min}`;
 
     const contractVal = parseFloat(form.contractValue.replace(/\./g, "").replace(",", ".")) || 0;
 
@@ -1325,26 +1334,15 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
       budgeted: totalValue,
       contractValue: contractVal,
       urgency: form.urgency,
-      quoteDeadline: form.quoteDeadline,
       startDate: form.startDate,
       endDate: form.endDate,
       status: "Solicitado",
-      milestones: [
-        {
-          label: "Avaliação do orçamento",
-          done: false,
-          date: "",
-          status: "Pendente",
-          description: "Avaliação técnica e comercial do orçamento solicitado.",
-          deadline: form.quoteDeadline,
-          completedAt: "",
-          photos: [],
-        },
-      ],
-      createdAt: todayStr,
+      milestones: [],
+      createdAt: createdAtStr,
     };
 
     onQuoteCreated(newQuote);
+    setSubmittedAt(createdAtStr);
     setSubmitted(true);
   };
 
@@ -1392,8 +1390,8 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
             );
           })()}
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Orçamento válido até</span>
-            <span className="font-medium font-mono">{form.quoteDeadline || "—"}</span>
+            <span className="text-muted-foreground">Gerado em</span>
+            <span className="font-medium font-mono">{submittedAt}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Início / Entrega</span>
@@ -1635,17 +1633,6 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
         {/* Dates */}
         <div className="bg-card border border-border rounded-xl p-4 space-y-4">
           <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Datas</p>
-          <div>
-            <label className="text-xs font-medium text-foreground block mb-1.5 flex items-center gap-1.5">
-              <CalendarClock size={12} className="text-accent" /> Fechamento do orçamento
-            </label>
-            <input
-              type="date"
-              value={form.quoteDeadline}
-              onChange={e => setForm({ ...form, quoteDeadline: e.target.value })}
-              className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
-            />
-          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-foreground block mb-1.5 flex items-center gap-1.5">
@@ -1654,7 +1641,7 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
               <input
                 type="date"
                 value={form.startDate}
-                onChange={e => setForm({ ...form, startDate: e.target.value })}
+                onChange={e => { setForm({ ...form, startDate: e.target.value }); setDateError(""); }}
                 className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
               />
             </div>
@@ -1665,11 +1652,17 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
               <input
                 type="date"
                 value={form.endDate}
-                onChange={e => setForm({ ...form, endDate: e.target.value })}
+                onChange={e => { setForm({ ...form, endDate: e.target.value }); setDateError(""); }}
                 className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
               />
             </div>
           </div>
+          {dateError && (
+            <p className="text-xs text-red-500 flex items-center gap-1.5">
+              <span className="w-1 h-1 rounded-full bg-red-500 shrink-0" />
+              {dateError}
+            </p>
+          )}
         </div>
 
         <button
@@ -1735,12 +1728,12 @@ function QuotesList({ quotes, onOpenQuote }: { quotes: QuoteRecord[]; onOpenQuot
                     {q.status}
                   </span>
                 </div>
-                {/* Row 2: urgency + deadline */}
+                {/* Row 2: urgency + created */}
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${urgencyColors[q.urgency] ?? "bg-gray-100 text-gray-600"}`}>
                     {q.urgency}
                   </span>
-                  <span className="text-[10px] font-mono text-muted-foreground">Válido até {q.quoteDeadline || "—"}</span>
+                  <span className="text-[10px] font-mono text-muted-foreground">Criado em {q.createdAt}</span>
                 </div>
                 {/* Row 3: financial */}
                 <div className="flex items-center gap-4 mb-2">
@@ -1753,8 +1746,6 @@ function QuotesList({ quotes, onOpenQuote }: { quotes: QuoteRecord[]; onOpenQuot
                     <p className="text-sm font-mono font-semibold text-accent">{fmt(q.contractValue)}</p>
                   </div>
                 </div>
-                {/* Row 4: created at */}
-                <p className="text-[10px] text-muted-foreground font-mono">Criado em {q.createdAt}</p>
               </button>
             ))}
           </div>
@@ -1902,9 +1893,9 @@ function QuoteDetail({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <CalendarClock size={14} className="text-accent" />
-              <span>Fechamento do orçamento</span>
+              <span>Gerado em</span>
             </div>
-            <span className="text-sm font-mono font-medium text-foreground">{quote.quoteDeadline || "—"}</span>
+            <span className="text-sm font-mono font-medium text-foreground">{quote.createdAt || "—"}</span>
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
