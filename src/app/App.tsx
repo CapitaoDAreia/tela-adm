@@ -483,7 +483,7 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
                 <div className="flex items-center justify-between mt-2.5">
                   <span className="text-xs text-muted-foreground">{project.client}</span>
                   <span className="text-xs font-mono text-muted-foreground">
-                    {fmt(project.spent)} / {fmt(project.budgeted)}
+                    {fmt(project.expenses.reduce((s, e) => s + e.amount, 0))} / {fmt(project.budgeted)}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border">
@@ -903,9 +903,10 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
     description: "", deadline: "", completedAt: "", photos: [],
   };
 
-  const remaining = project.budgeted - project.spent;
+  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+  const remaining = project.budgeted - totalExpenses;
   const pieData = [
-    { name: "Executado", value: project.spent },
+    { name: "Gasto", value: totalExpenses },
     { name: "Restante", value: Math.max(0, remaining) },
   ];
   const PIE_COLORS = ["#D97706", "#EDF0F4"];
@@ -969,14 +970,12 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
           <p className="font-semibold font-mono text-sm">{fmt(project.budgeted)}</p>
         </div>
         <div>
-          <p className="text-[10px] text-primary-foreground/60 font-mono">Executado</p>
-          <p className="font-semibold font-mono text-sm text-amber-400">{fmt(project.spent)}</p>
+          <p className="text-[10px] text-primary-foreground/60 font-mono">Gasto</p>
+          <p className="font-semibold font-mono text-sm text-amber-400">{fmt(totalExpenses)}</p>
         </div>
         <div>
-          <p className="text-[10px] text-primary-foreground/60 font-mono">Despesas</p>
-          <p className="font-semibold font-mono text-sm text-orange-300">
-            {fmt(expenses.reduce((s, e) => s + e.amount, 0))}
-          </p>
+          <p className="text-[10px] text-primary-foreground/60 font-mono">Contrato</p>
+          <p className="font-semibold font-mono text-sm text-green-400">{fmt(project.contractValue)}</p>
         </div>
         <div className="text-right">
           <p className="text-[10px] text-primary-foreground/60 font-mono">Saldo</p>
@@ -1513,23 +1512,26 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                 onClick={() => {
                   const parsed = parseFloat(expenseDraft.amount.replace(/\./g, "").replace(",", "."));
                   if (!expenseDraft.description.trim() || isNaN(parsed)) return;
+                  let nextExpenses: Expense[];
                   if (editingExpenseId !== null) {
-                    setExpenses(prev => prev.map(e => e.id === editingExpenseId
+                    nextExpenses = expenses.map(e => e.id === editingExpenseId
                       ? { ...e, description: expenseDraft.description, category: expenseDraft.category, amount: parsed, notes: expenseDraft.notes || undefined }
                       : e
-                    ));
+                    );
                   } else {
                     const now = new Date();
                     const dateStr = now.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).replace(".", "");
-                    setExpenses(prev => [...prev, {
+                    nextExpenses = [...expenses, {
                       id: Date.now(),
                       date: dateStr,
                       description: expenseDraft.description,
                       category: expenseDraft.category,
                       amount: parsed,
                       notes: expenseDraft.notes || undefined,
-                    }]);
+                    }];
                   }
+                  setExpenses(nextExpenses);
+                  onUpdateProject?.({ ...project, milestones, expenses: nextExpenses, status, progress: computedProgress, phase: computedPhase });
                   setExpenseDraft({ description: "", category: "Material", amount: "", notes: "" });
                   setEditingExpenseId(null);
                   setAddingExpense(false);
@@ -2182,7 +2184,8 @@ function QuoteDetail({
   };
 
   const handleApprove = () => {
-    const updated = addHistory({ ...quote, status: "Aprovado" }, "Orçamento aprovado.");
+    const ts = nowTs();
+    const updated = addHistory({ ...quote, status: "Aprovado", quoteDeadline: ts }, "Orçamento aprovado.");
     onUpdateQuote(updated);
   };
 
@@ -2306,7 +2309,7 @@ function QuoteDetail({
           )}
           <div className="space-y-2">
             {quote.items.map(item => (
-              editingItemId === item.id && editItemDraft ? (
+              editingItemId === item.id && editItemDraft && !isReadOnly ? (
                 <div key={item.id} className="border border-accent/30 rounded-xl p-3 space-y-2.5 bg-accent/5">
                   <input
                     type="text"
@@ -2467,8 +2470,7 @@ function QuoteDetail({
 // ─── Report Modal ────────────────────────────────────────────────────────────
 
 function ReportModal({ project, onClose }: { project: Project; onClose: () => void }) {
-  const totalExpensesFromProps = project.expenses.reduce((s, e) => s + e.amount, 0);
-  const spent = totalExpensesFromProps > 0 ? totalExpensesFromProps : project.spent;
+  const spent = project.expenses.reduce((s, e) => s + e.amount, 0);
   const remaining = project.budgeted - spent;
   const spentPct = Math.min(100, Math.round((spent / project.budgeted) * 100));
 
