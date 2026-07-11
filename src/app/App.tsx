@@ -480,6 +480,22 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
   const [draft, setDraft] = useState<Milestone>({ ...step });
   const [workerNote, setWorkerNote] = useState("");
   const [pendingStatus, setPendingStatus] = useState<StepStatus | null>(null);
+  const [extendingDeadline, setExtendingDeadline] = useState(false);
+  const [newDeadline, setNewDeadline] = useState("");
+  const [extensionReason, setExtensionReason] = useState("");
+
+  const formatDeadline = (d: string) => {
+    if (!d) return "Não definido";
+    return d.includes("-") ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR") : d;
+  };
+
+  const confirmExtension = () => {
+    if (!newDeadline) return;
+    setDraft(prev => ({ ...prev, deadline: newDeadline }));
+    setExtendingDeadline(false);
+    setNewDeadline("");
+    setExtensionReason("");
+  };
 
   const handleStatusRequest = (s: StepStatus) => {
     if (s === draft.status) return;
@@ -533,16 +549,55 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
           )}
 
           {/* Prazo — definido no planejamento, fora das seções */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground block mb-1.5 flex items-center gap-1.5">
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground block flex items-center gap-1.5">
               <CalendarClock size={11} className="text-accent" /> Prazo previsto
             </label>
-            <input
-              type="date"
-              value={draft.deadline}
-              onChange={e => setDraft({ ...draft, deadline: e.target.value })}
-              className="w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
-            />
+            {isNew ? (
+              <input
+                type="date"
+                value={draft.deadline}
+                onChange={e => setDraft({ ...draft, deadline: e.target.value })}
+                className="w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+              />
+            ) : extendingDeadline ? (
+              <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>Prazo atual:</span>
+                  <span className="font-mono text-foreground">{formatDeadline(draft.deadline)}</span>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Novo prazo</label>
+                  <input
+                    type="date"
+                    value={newDeadline}
+                    onChange={e => setNewDeadline(e.target.value)}
+                    className="w-full bg-input-background rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Motivo da extensão <span className="text-muted-foreground/50">(opcional)</span></label>
+                  <textarea
+                    value={extensionReason}
+                    onChange={e => setExtensionReason(e.target.value)}
+                    rows={2}
+                    placeholder="Ex: atraso na entrega de materiais..."
+                    className="w-full bg-input-background rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground resize-none"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => { setExtendingDeadline(false); setNewDeadline(""); setExtensionReason(""); }} className="flex-1 py-2 bg-muted text-muted-foreground rounded-lg text-xs font-medium hover:bg-secondary transition-colors">Cancelar</button>
+                  <button type="button" onClick={confirmExtension} disabled={!newDeadline} className="flex-1 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Confirmar extensão</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between px-3 py-2.5 bg-input-background rounded-lg border border-border">
+                <span className="text-xs font-mono text-foreground">{formatDeadline(draft.deadline)}</span>
+                <button type="button" onClick={() => setExtendingDeadline(true)} className="text-xs text-accent hover:text-accent/80 font-medium transition-colors flex items-center gap-1">
+                  <CalendarClock size={11} /> Estender prazo
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Conclusão real — chip read-only, preenchido automaticamente ao marcar Concluído */}
