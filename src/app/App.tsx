@@ -2503,7 +2503,7 @@ export default function App() {
       contractValue: q.contractValue,
       spent: 0,
       expenses: [],
-      milestones: q.milestones,
+      milestones: [],
       photos: [],
       phase: "Iniciando",
       location: "–",
