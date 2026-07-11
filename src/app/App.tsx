@@ -7,7 +7,8 @@ import {
   Camera, FileText, LayoutDashboard, Receipt, Image,
   CheckCircle, Circle, Upload, Phone, User, DollarSign,
   HardHat, Wrench, Home, CalendarDays, CalendarCheck, CalendarClock,
-  ListChecks, ChevronRight, Trash2, PackagePlus, ClipboardList, FilePlus
+  ListChecks, ChevronRight, Trash2, PackagePlus, ClipboardList, FilePlus,
+  Printer, ShieldCheck, HardHatIcon, FileBarChart2
 } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -455,13 +456,6 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
         </div>
       </main>
 
-      {/* FAB */}
-      <button
-        onClick={onNewProject}
-        className="fixed bottom-6 right-6 bg-accent text-accent-foreground rounded-full w-14 h-14 flex items-center justify-center shadow-lg hover:bg-amber-600 transition-colors z-50"
-      >
-        <Plus size={24} />
-      </button>
     </div>
   );
 }
@@ -484,6 +478,9 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
   isNew?: boolean;
 }) {
   const [draft, setDraft] = useState<Milestone>({ ...step });
+  const [workerNote, setWorkerNote] = useState("");
+
+  const canComplete = draft.photos.length > 0 || draft.status !== "Concluído";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -497,109 +494,144 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-base font-semibold text-foreground" style={{ fontFamily: "'DM Serif Display', serif" }}>
-            {isNew ? "Nova Etapa" : "Editar Etapa"}
+            {isNew ? "Nova Etapa" : draft.label || "Editar Etapa"}
           </h3>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
             <X size={16} />
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-4">
-          {/* Label */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Nome da etapa</label>
-            <input
-              type="text"
-              value={draft.label}
-              onChange={e => setDraft({ ...draft, label: e.target.value })}
-              className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground"
-            />
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground block mb-2">Status</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(["Concluído", "Em andamento", "Pendente", "Cancelado"] as StepStatus[]).map(s => (
-                <button
-                  key={s} type="button"
-                  onClick={() => setDraft({ ...draft, status: s, done: s === "Concluído" })}
-                  className={`py-2 px-3 rounded-lg text-xs font-medium border transition-colors flex items-center gap-2 ${
-                    draft.status === s
-                      ? STEP_STATUS_CONFIG[s].color
-                      : "bg-muted text-muted-foreground border-border hover:border-accent/50"
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${draft.status === s ? STEP_STATUS_CONFIG[s].dot : "bg-muted-foreground/40"}`} />
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Descrição</label>
-            <textarea
-              rows={3}
-              value={draft.description}
-              onChange={e => setDraft({ ...draft, description: e.target.value })}
-              placeholder="Descreva o escopo desta etapa..."
-              className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50 resize-none"
-            />
-          </div>
-
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-3">
+        <div className="px-5 py-4 space-y-5">
+          {/* Nome (apenas se novo) */}
+          {isNew && (
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1.5 flex items-center gap-1">
-                <CalendarClock size={11} className="text-accent" /> Prazo
-              </label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1.5">Nome da etapa</label>
               <input
-                type="date"
-                value={draft.deadline}
-                onChange={e => setDraft({ ...draft, deadline: e.target.value })}
-                className="w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+                type="text"
+                value={draft.label}
+                onChange={e => setDraft({ ...draft, label: e.target.value })}
+                placeholder="Ex: Instalações hidráulicas"
+                className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50"
               />
             </div>
+          )}
+
+          {/* Descrição do escopo (se novo ou não preenchido) */}
+          {(isNew || draft.description) && (
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1.5 flex items-center gap-1">
-                <CalendarCheck size={11} className="text-accent" /> Conclusão real
-              </label>
-              <input
-                type="date"
-                value={draft.completedAt}
-                onChange={e => setDraft({ ...draft, completedAt: e.target.value })}
-                className="w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+              <label className="text-xs font-medium text-muted-foreground block mb-1.5">Descrição do escopo</label>
+              <textarea
+                rows={2}
+                value={draft.description}
+                onChange={e => setDraft({ ...draft, description: e.target.value })}
+                placeholder="Descreva o escopo desta etapa..."
+                className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50 resize-none"
               />
             </div>
-          </div>
+          )}
 
-          {/* Photos */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground block mb-2">Fotos de evidência</label>
-            {draft.photos.length > 0 && (
-              <div className="grid grid-cols-3 gap-2 mb-2">
-                {draft.photos.map((url, i) => (
-                  <div key={i} className="relative rounded-lg overflow-hidden aspect-square bg-muted">
-                    <img src={url} alt="" className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => setDraft({ ...draft, photos: draft.photos.filter((_, j) => j !== i) })}
-                      className="absolute top-1 right-1 bg-black/60 rounded-full p-0.5 text-white hover:bg-black/80 transition-colors"
-                    >
-                      <X size={10} />
-                    </button>
-                  </div>
-                ))}
+          {/* ── Seção: Execução (trabalhador) ── */}
+          <div className="rounded-xl border border-border bg-muted/40 overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/60">
+              <HardHat size={13} className="text-muted-foreground" />
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Registro da execução</span>
+            </div>
+            <div className="px-4 py-3 space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1.5">Nota de progresso</label>
+                <textarea
+                  rows={2}
+                  value={workerNote}
+                  onChange={e => setWorkerNote(e.target.value)}
+                  placeholder="Descreva o que foi feito, materiais usados, observações..."
+                  className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50 resize-none"
+                />
               </div>
-            )}
-            <button
-              type="button"
-              className="w-full py-2.5 border border-dashed border-border rounded-lg text-xs text-muted-foreground hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2"
-            >
-              <Upload size={13} /> Anexar fotos
-            </button>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1.5 flex items-center gap-1.5">
+                  <Camera size={11} className="text-accent" />
+                  Evidências fotográficas
+                  {draft.photos.length === 0 && draft.status === "Concluído" && (
+                    <span className="text-[10px] text-amber-500 font-normal">(recomendado para concluir)</span>
+                  )}
+                </label>
+                {draft.photos.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2 mb-2">
+                    {draft.photos.map((url, i) => (
+                      <div key={i} className="relative rounded-lg overflow-hidden aspect-square bg-muted">
+                        <img src={url} alt="" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setDraft({ ...draft, photos: draft.photos.filter((_, j) => j !== i) })}
+                          className="absolute top-1 right-1 bg-black/60 rounded-full p-0.5 text-white hover:bg-black/80 transition-colors"
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="w-full py-2.5 border border-dashed border-border rounded-lg text-xs text-muted-foreground hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2"
+                >
+                  <Upload size={13} /> Anexar fotos / vídeos
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Seção: Aprovação (supervisor) ── */}
+          <div className="rounded-xl border border-border overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-primary/5">
+              <ShieldCheck size={13} className="text-primary" />
+              <span className="text-[11px] font-semibold text-primary/70 uppercase tracking-wider">Aprovação do supervisor</span>
+            </div>
+            <div className="px-4 py-3 space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-2">Status</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["Concluído", "Em andamento", "Pendente", "Cancelado"] as StepStatus[]).map(s => (
+                    <button
+                      key={s} type="button"
+                      onClick={() => setDraft({ ...draft, status: s, done: s === "Concluído" })}
+                      className={`py-2 px-3 rounded-lg text-xs font-medium border transition-colors flex items-center gap-2 ${
+                        draft.status === s
+                          ? STEP_STATUS_CONFIG[s].color
+                          : "bg-muted text-muted-foreground border-border hover:border-accent/50"
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${draft.status === s ? STEP_STATUS_CONFIG[s].dot : "bg-muted-foreground/40"}`} />
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1.5 flex items-center gap-1">
+                    <CalendarClock size={11} className="text-accent" /> Prazo
+                  </label>
+                  <input
+                    type="date"
+                    value={draft.deadline}
+                    onChange={e => setDraft({ ...draft, deadline: e.target.value })}
+                    className="w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1.5 flex items-center gap-1">
+                    <CalendarCheck size={11} className="text-accent" /> Conclusão real
+                  </label>
+                  <input
+                    type="date"
+                    value={draft.completedAt}
+                    onChange={e => setDraft({ ...draft, completedAt: e.target.value })}
+                    className="w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -618,7 +650,7 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
             onClick={() => { onSave(draft); onClose(); }}
             className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/80 transition-colors disabled:opacity-40 disabled:pointer-events-none"
           >
-            {isNew ? "Criar etapa" : "Salvar alterações"}
+            {isNew ? "Criar etapa" : "Salvar"}
           </button>
         </div>
       </div>
@@ -635,6 +667,7 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
   const [creatingStep, setCreatingStep] = useState(false);
   const [addingExpense, setAddingExpense] = useState(false);
   const [expenseDraft, setExpenseDraft] = useState({ description: "", category: "Material", amount: "" });
+  const [showReport, setShowReport] = useState(false);
 
   const emptyStep: Milestone = {
     label: "", done: false, date: "", status: "Pendente",
@@ -668,6 +701,13 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
           className="absolute top-4 left-4 bg-white/20 backdrop-blur-sm rounded-full p-2 text-white hover:bg-white/30 transition-colors"
         >
           <ArrowLeft size={18} />
+        </button>
+        <button
+          onClick={() => setShowReport(true)}
+          className="absolute top-4 right-4 bg-white/20 backdrop-blur-sm rounded-full p-2 text-white hover:bg-white/30 transition-colors"
+          title="Gerar relatório"
+        >
+          <FileBarChart2 size={18} />
         </button>
         <div className="absolute bottom-4 left-4 right-4">
           <div className="flex items-start justify-between gap-3">
@@ -1010,6 +1050,14 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
         )}
       </div>
 
+
+      {/* Report modal */}
+      {showReport && (
+        <ReportModal
+          project={{ ...project, milestones, expenses }}
+          onClose={() => setShowReport(false)}
+        />
+      )}
 
       {/* Step edit modal */}
       {editingStep && (
@@ -1780,6 +1828,225 @@ function QuoteDetail({
           >
             <HardHat size={16} /> Gerar Obra
           </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Report Modal ────────────────────────────────────────────────────────────
+
+function ReportModal({ project, onClose }: { project: Project; onClose: () => void }) {
+  const totalExpensesFromProps = project.expenses.reduce((s, e) => s + e.amount, 0);
+  const spent = totalExpensesFromProps > 0 ? totalExpensesFromProps : project.spent;
+  const remaining = project.budgeted - spent;
+  const spentPct = Math.min(100, Math.round((spent / project.budgeted) * 100));
+
+  const now = new Date();
+  const [d1, m1, y1] = project.startDate !== "–" ? project.startDate.split("/").map(Number) : [null, null, null];
+  const [d2, m2, y2] = project.endDate !== "–" ? project.endDate.split("/").map(Number) : [null, null, null];
+  const start = d1 ? new Date(y1!, m1! - 1, d1) : null;
+  const end = d2 ? new Date(y2!, m2! - 1, d2) : null;
+  const totalDays = start && end ? Math.max(1, (end.getTime() - start.getTime()) / 86400000) : null;
+  const elapsedDays = start ? Math.max(0, Math.min(totalDays ?? 0, (now.getTime() - start.getTime()) / 86400000)) : null;
+  const timePct = totalDays && elapsedDays != null ? Math.round((elapsedDays / totalDays) * 100) : null;
+
+  const handlePrint = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    const milestoneRows = project.milestones.map(m => {
+      const cfg = { "Concluído": "✅", "Em andamento": "🔄", "Pendente": "⏳", "Cancelado": "❌" };
+      const icon = cfg[m.status] ?? "○";
+      const photosHtml = m.photos.length > 0
+        ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">${m.photos.map(url => `<img src="${url}" style="width:120px;height:80px;object-fit:cover;border-radius:6px" />`).join("")}</div>`
+        : "";
+      return `
+        <div style="margin-bottom:12px;padding:12px;border:1px solid #e5e5e5;border-radius:8px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span>${icon}</span>
+            <strong>${m.label}</strong>
+            <span style="font-size:11px;color:#888;margin-left:auto">${m.deadline ? "Prazo: " + m.deadline : ""} ${m.completedAt ? "| Concluído: " + m.completedAt : ""}</span>
+          </div>
+          ${m.description ? `<p style="font-size:12px;color:#666;margin:4px 0 0 22px">${m.description}</p>` : ""}
+          ${photosHtml}
+        </div>`;
+    }).join("");
+
+    const galleryHtml = project.photos.length > 0
+      ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">${project.photos.map(ph => `<div><img src="${ph.url}" style="width:180px;height:120px;object-fit:cover;border-radius:8px"/><p style="font-size:10px;color:#888;margin:3px 0 0">${ph.caption}</p></div>`).join("")}</div>`
+      : "<p style='color:#aaa;font-size:12px'>Nenhuma foto na galeria.</p>";
+
+    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Relatório – ${project.name}</title>
+    <style>
+      body{font-family:system-ui,sans-serif;color:#1a1a1a;padding:32px;max-width:800px;margin:0 auto}
+      h1{font-size:24px;margin:0 0 4px}h2{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#888;margin:24px 0 8px;border-bottom:1px solid #eee;padding-bottom:4px}
+      .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+      .stat{display:inline-block;margin-right:24px}.stat-label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.06em}.stat-value{font-size:20px;font-weight:700}
+      .bar-bg{background:#eee;border-radius:4px;height:8px;margin-top:4px}.bar-fill{height:8px;border-radius:4px;background:#D97706}
+      @media print{body{padding:16px}}
+    </style></head><body>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between">
+      <div>
+        <p style="font-size:11px;color:#888;margin:0">RELATÓRIO DA OBRA · ${new Date().toLocaleDateString("pt-BR")}</p>
+        <h1>${project.name}</h1>
+        <p style="color:#666;margin:2px 0">${project.client} · ${project.location}</p>
+        <p style="font-size:12px;color:#888;margin:4px 0">${project.startDate} → ${project.endDate}</p>
+      </div>
+      <span class="badge" style="background:#fef3c7;color:#92400e">${project.status}</span>
+    </div>
+
+    <h2>Financeiro</h2>
+    <div>
+      <div class="stat"><div class="stat-label">Orçado</div><div class="stat-value">R$ ${(project.budgeted/1000).toFixed(0)}k</div></div>
+      <div class="stat"><div class="stat-label">Executado</div><div class="stat-value" style="color:#D97706">R$ ${(spent/1000).toFixed(0)}k</div></div>
+      <div class="stat"><div class="stat-label">Saldo</div><div class="stat-value" style="color:${remaining>=0?"#16a34a":"#dc2626"}">R$ ${(Math.abs(remaining)/1000).toFixed(0)}k</div></div>
+    </div>
+    <div style="margin-top:12px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#888;margin-bottom:3px"><span>Progresso do orçamento</span><span>${spentPct}%</span></div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${spentPct}%"></div></div>
+    </div>
+    ${timePct != null ? `<div style="margin-top:8px"><div style="display:flex;justify-content:space-between;font-size:11px;color:#888;margin-bottom:3px"><span>Tempo decorrido</span><span>${timePct}%</span></div><div class="bar-bg"><div class="bar-fill" style="width:${timePct}%;background:#6366f1"></div></div></div>` : ""}
+
+    <h2>Progresso da Obra — ${project.progress}%</h2>
+    <p style="font-size:13px;color:#555">Fase atual: <strong>${project.phase}</strong></p>
+
+    <h2>Etapas</h2>
+    ${milestoneRows}
+
+    <h2>Galeria</h2>
+    ${galleryHtml}
+
+    <script>window.onload=()=>{window.print()}<\/script>
+    </body></html>`);
+    printWindow.document.close();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-card shrink-0">
+        <div className="flex items-center gap-3">
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider">Relatório</p>
+            <h2 className="text-base font-semibold text-foreground" style={{ fontFamily: "'DM Serif Display', serif" }}>
+              {project.name}
+            </h2>
+          </div>
+        </div>
+        <button
+          onClick={handlePrint}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          <Printer size={15} /> Gerar PDF
+        </button>
+      </div>
+
+      {/* Preview */}
+      <div className="flex-1 overflow-y-auto px-4 py-5 max-w-2xl w-full mx-auto pb-10">
+        {/* Capa */}
+        <div className="bg-card border border-border rounded-xl overflow-hidden mb-4">
+          <div className="relative h-36 bg-muted">
+            <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+            <div className="absolute bottom-3 left-4 right-4">
+              <p className="text-white/70 text-xs">{project.location}</p>
+              <h3 className="text-white text-lg font-semibold leading-tight" style={{ fontFamily: "'DM Serif Display', serif" }}>
+                {project.name}
+              </h3>
+            </div>
+          </div>
+          <div className="px-4 py-3 grid grid-cols-2 gap-y-1 text-sm">
+            <div><span className="text-muted-foreground text-xs">Cliente</span><p className="font-medium">{project.client}</p></div>
+            <div><span className="text-muted-foreground text-xs">Status</span><p className="font-medium">{project.status}</p></div>
+            <div><span className="text-muted-foreground text-xs">Início</span><p className="font-mono text-xs">{project.startDate}</p></div>
+            <div><span className="text-muted-foreground text-xs">Entrega</span><p className="font-mono text-xs">{project.endDate}</p></div>
+          </div>
+        </div>
+
+        {/* Financeiro */}
+        <div className="bg-card border border-border rounded-xl p-4 mb-4">
+          <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider mb-3">Financeiro</p>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {[
+              { label: "Orçado", value: fmt(project.budgeted), color: "text-foreground" },
+              { label: "Executado", value: fmt(spent), color: "text-amber-500" },
+              { label: "Saldo", value: fmt(remaining), color: remaining >= 0 ? "text-green-600" : "text-red-500" },
+            ].map(s => (
+              <div key={s.label} className="bg-muted rounded-lg p-3 text-center">
+                <p className="text-[10px] text-muted-foreground font-mono uppercase">{s.label}</p>
+                <p className={`text-sm font-semibold font-mono mt-1 ${s.color}`}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="space-y-2">
+            <div>
+              <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                <span>Orçamento utilizado</span><span>{spentPct}%</span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div className="h-full bg-accent rounded-full" style={{ width: `${spentPct}%` }} />
+              </div>
+            </div>
+            {timePct != null && (
+              <div>
+                <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                  <span>Tempo decorrido</span><span>{timePct}%</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${timePct}%` }} />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Etapas */}
+        <div className="bg-card border border-border rounded-xl p-4 mb-4">
+          <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider mb-3">
+            Etapas · {project.milestones.filter(m => m.done).length}/{project.milestones.length} concluídas
+          </p>
+          <div className="space-y-2">
+            {project.milestones.map((m, i) => {
+              const cfg = STEP_STATUS_CONFIG[m.status];
+              return (
+                <div key={i} className="rounded-lg border border-border overflow-hidden">
+                  <div className="flex items-center gap-2.5 px-3 py-2.5">
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.dot}`} />
+                    <p className="text-sm font-medium text-foreground flex-1">{m.label}</p>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${cfg.color}`}>{cfg.label}</span>
+                  </div>
+                  {m.photos.length > 0 && (
+                    <div className="flex gap-2 px-3 pb-3 overflow-x-auto">
+                      {m.photos.map((url, j) => (
+                        <img key={j} src={url} alt="" className="w-24 h-16 object-cover rounded-lg shrink-0 border border-border" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Galeria */}
+        {project.photos.length > 0 && (
+          <div className="bg-card border border-border rounded-xl p-4">
+            <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider mb-3">Galeria</p>
+            <div className="grid grid-cols-2 gap-2">
+              {project.photos.map((ph, i) => (
+                <div key={i} className="rounded-lg overflow-hidden border border-border">
+                  <img src={ph.url} alt={ph.caption} className="w-full h-28 object-cover" />
+                  <div className="px-2 py-1.5">
+                    <p className="text-xs font-medium text-foreground leading-snug">{ph.caption}</p>
+                    <p className="text-[10px] text-muted-foreground font-mono">{ph.date}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>
