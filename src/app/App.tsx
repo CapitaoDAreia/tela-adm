@@ -24,6 +24,11 @@ interface QuoteItem {
 
 type QuoteStatus = "Solicitado" | "Em análise" | "Aprovado" | "Cancelado";
 
+interface QuoteHistoryEntry {
+  datetime: string;
+  description: string;
+}
+
 interface QuoteRecord {
   id: number;
   clientName: string;
@@ -39,7 +44,7 @@ interface QuoteRecord {
   status: QuoteStatus;
   cancellationReason?: string;
   analysisStartedAt?: string;
-  milestones: Milestone[];
+  history: QuoteHistoryEntry[];
   createdAt: string;
 }
 
@@ -231,8 +236,10 @@ const MOCK_QUOTES: QuoteRecord[] = [
     startDate: "",
     endDate: "",
     status: "Em análise",
-    milestones: [
-      { label: "Avaliação do orçamento", done: false, date: "Jul 2025", status: "Em andamento", description: "Análise técnica e comercial do escopo solicitado.", deadline: "25/07/2025", completedAt: "", photos: [] },
+    analysisStartedAt: "08/07/2025 10:15",
+    history: [
+      { datetime: "08/07/2025 09:30", description: "Orçamento criado." },
+      { datetime: "08/07/2025 10:15", description: "Análise iniciada." },
     ],
     createdAt: "08/07/2025 09:30",
   },
@@ -254,8 +261,8 @@ const MOCK_QUOTES: QuoteRecord[] = [
     startDate: "",
     endDate: "",
     status: "Solicitado",
-    milestones: [
-      { label: "Avaliação do orçamento", done: false, date: "Jul 2025", status: "Pendente", description: "", deadline: "15/07/2025", completedAt: "", photos: [] },
+    history: [
+      { datetime: "07/07/2025 14:15", description: "Orçamento criado." },
     ],
     createdAt: "07/07/2025 14:15",
   },
@@ -278,8 +285,10 @@ const MOCK_QUOTES: QuoteRecord[] = [
     startDate: "",
     endDate: "",
     status: "Aprovado",
-    milestones: [
-      { label: "Avaliação do orçamento", done: true, date: "Jun 2025", status: "Concluído", description: "Escopo aprovado pela cliente após ajustes.", deadline: "30/06/2025", completedAt: "28/06/2025", photos: [] },
+    history: [
+      { datetime: "20/06/2025 11:00", description: "Orçamento criado." },
+      { datetime: "22/06/2025 09:00", description: "Análise iniciada." },
+      { datetime: "28/06/2025 15:30", description: "Orçamento aprovado." },
     ],
     createdAt: "20/06/2025 11:00",
   },
@@ -299,7 +308,11 @@ const MOCK_QUOTES: QuoteRecord[] = [
     endDate: "",
     status: "Cancelado",
     cancellationReason: "Cliente desistiu do projeto após análise do escopo.",
-    milestones: [],
+    history: [
+      { datetime: "01/06/2025 10:00", description: "Orçamento criado." },
+      { datetime: "03/06/2025 11:00", description: "Análise iniciada." },
+      { datetime: "10/06/2025 16:00", description: "Orçamento cancelado — Motivo: Cliente desistiu do projeto após análise do escopo." },
+    ],
     createdAt: "01/06/2025 10:00",
   },
 ];
@@ -1358,7 +1371,7 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
       startDate: form.startDate,
       endDate: form.endDate,
       status: "Solicitado",
-      milestones: [],
+      history: [{ datetime: createdAtStr, description: "Orçamento criado." }],
       createdAt: createdAtStr,
     };
 
@@ -1836,36 +1849,65 @@ function QuoteDetail({
 
   const saveItemEdit = () => {
     if (!editItemDraft) return;
-    onUpdateQuote({ ...quote, items: quote.items.map(i => i.id === editItemDraft.id ? editItemDraft : i) });
+    const updated = addHistory(
+      { ...quote, items: quote.items.map(i => i.id === editItemDraft.id ? editItemDraft : i) },
+      `Item "${editItemDraft.title}" editado.`
+    );
+    onUpdateQuote(updated);
     setEditingItemId(null);
     setEditItemDraft(null);
   };
 
   const removeItem = (id: number) => {
-    onUpdateQuote({ ...quote, items: quote.items.filter(i => i.id !== id) });
+    const item = quote.items.find(i => i.id === id);
+    const updated = addHistory(
+      { ...quote, items: quote.items.filter(i => i.id !== id) },
+      `Item "${item?.title ?? id}" removido.`
+    );
+    onUpdateQuote(updated);
   };
 
   const addQuoteItem = () => {
     if (!newQuoteItem.title.trim() || !newQuoteItem.amount.trim()) return;
     const newId = Math.max(0, ...quote.items.map(i => i.id)) + 1;
-    onUpdateQuote({ ...quote, items: [...quote.items, { ...newQuoteItem, id: newId }] });
+    const updated = addHistory(
+      { ...quote, items: [...quote.items, { ...newQuoteItem, id: newId }] },
+      `Item "${newQuoteItem.title}" adicionado.`
+    );
+    onUpdateQuote(updated);
     setNewQuoteItem({ title: "", description: "", amount: "" });
     setAddingQuoteItem(false);
   };
 
-  const handleStartAnalysis = () => {
+  const nowTs = () => {
     const now = new Date();
-    const ts = `${String(now.getDate()).padStart(2,"0")}/${String(now.getMonth()+1).padStart(2,"0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
-    onUpdateQuote({ ...quote, status: "Em análise", analysisStartedAt: ts });
+    return `${String(now.getDate()).padStart(2,"0")}/${String(now.getMonth()+1).padStart(2,"0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+  };
+
+  const addHistory = (q: QuoteRecord, description: string): QuoteRecord => ({
+    ...q,
+    history: [...(q.history ?? []), { datetime: nowTs(), description }],
+  });
+
+  const handleStartAnalysis = () => {
+    const ts = nowTs();
+    const updated = addHistory({ ...quote, status: "Em análise", analysisStartedAt: ts }, "Análise iniciada.");
+    onUpdateQuote(updated);
   };
 
   const handleApprove = () => {
-    onUpdateQuote({ ...quote, status: "Aprovado" });
+    const updated = addHistory({ ...quote, status: "Aprovado" }, "Orçamento aprovado.");
+    onUpdateQuote(updated);
   };
 
   const handleConfirmCancel = () => {
     if (!cancelReason.trim()) return;
-    onUpdateQuote({ ...quote, status: "Cancelado", cancellationReason: cancelReason.trim() });
+    const reason = cancelReason.trim();
+    const updated = addHistory(
+      { ...quote, status: "Cancelado", cancellationReason: reason },
+      `Orçamento cancelado — Motivo: ${reason}`
+    );
+    onUpdateQuote(updated);
     setCancellingQuote(false);
     setCancelReason("");
   };
@@ -2059,6 +2101,27 @@ function QuoteDetail({
             )}
           </div>
         </div>
+
+        {/* Histórico */}
+        {quote.history && quote.history.length > 0 && (
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Histórico</p>
+            <div className="space-y-0">
+              {[...quote.history].reverse().map((entry, i) => (
+                <div key={i} className={`flex gap-3 py-2.5 ${i < quote.history.length - 1 ? "border-b border-border" : ""}`}>
+                  <div className="flex flex-col items-center shrink-0 pt-0.5">
+                    <span className="w-2 h-2 rounded-full bg-accent shrink-0" />
+                    {i < quote.history.length - 1 && <span className="w-px flex-1 bg-border mt-1" />}
+                  </div>
+                  <div className="flex-1 min-w-0 pb-1">
+                    <p className="text-sm text-foreground leading-snug">{entry.description}</p>
+                    <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{entry.datetime}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Dates section */}
         <div className="bg-card border border-border rounded-xl p-4 space-y-3">
