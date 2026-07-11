@@ -57,6 +57,9 @@ interface Expense {
   category: string;
   amount: number;
   notes?: string;
+  isPayment?: boolean;
+  paymentStatus?: "Realizado" | "A fazer";
+  dueDate?: string;
 }
 
 type StepStatus = "Concluído" | "Em andamento" | "Pendente" | "Cancelado";
@@ -123,6 +126,8 @@ const PROJECTS: Project[] = [
       { id: 3, date: "21 Jun 2025", description: "Instalação elétrica – pontos extras", category: "Serviço", amount: 1950 },
       { id: 4, date: "15 Jun 2025", description: "Bancada de quartzo – cozinha compacta", category: "Material", amount: 3400 },
       { id: 5, date: "07 Jun 2025", description: "Louças e metais – banheiro", category: "Material", amount: 2750 },
+      { id: 6, date: "08 Jul 2025", description: "Parcela 4/6 – equipe Monteiro", category: "Serviço", amount: 6200, isPayment: true, paymentStatus: "A fazer", dueDate: "2025-07-15" },
+      { id: 7, date: "08 Jul 2025", description: "Fornecedor Pedreira Boa Vista", category: "Material", amount: 3800, isPayment: true, paymentStatus: "A fazer", dueDate: "2025-07-20" },
     ],
     milestones: [
       { label: "Demolição e limpeza", done: true, date: "Mar 2025", status: "Concluído", description: "Remoção do revestimento existente, demolição de paredes não estruturais e limpeza completa do apartamento.", deadline: "20/03/2025", completedAt: "18/03/2025", photos: ["https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=400&h=300&fit=crop"] },
@@ -156,6 +161,7 @@ const PROJECTS: Project[] = [
       { id: 1, date: "03 Jul 2025", description: "Tijolo de vedação – paredes divisórias", category: "Material", amount: 1800 },
       { id: 2, date: "01 Jul 2025", description: "Mão de obra – alvenaria", category: "Serviço", amount: 3200 },
       { id: 3, date: "25 Jun 2025", description: "Tubulação hidráulica – banheiro e cozinha", category: "Material", amount: 1450 },
+      { id: 4, date: "08 Jul 2025", description: "Parcela 2/4 – equipe Ferreira", category: "Serviço", amount: 4500, isPayment: true, paymentStatus: "A fazer", dueDate: "2025-07-18" },
     ],
     milestones: [
       { label: "Demolição e adequação", done: true, date: "Mai 2025", status: "Concluído", description: "Demolição de revestimentos e adaptação do layout conforme projeto aprovado.", deadline: "10/05/2025", completedAt: "09/05/2025", photos: ["https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=400&h=300&fit=crop"] },
@@ -852,7 +858,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
   const [creatingStep, setCreatingStep] = useState(false);
   const [addingExpense, setAddingExpense] = useState(false);
   const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
-  const [expenseDraft, setExpenseDraft] = useState({ description: "", category: "Material", amount: "", notes: "" });
+  const [expenseDraft, setExpenseDraft] = useState({ description: "", category: "Material", amount: "", notes: "", isPayment: false, paymentStatus: "A fazer" as "Realizado" | "A fazer", dueDate: "" });
   const [projectAction, setProjectAction] = useState<"concluir" | "cancelar" | "pausar" | null>(null);
   const [projectActionReason, setProjectActionReason] = useState("");
 
@@ -1244,8 +1250,20 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                    <Receipt size={14} className="text-muted-foreground" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{exp.description}</p>
-                  <p className="text-xs text-muted-foreground">{exp.date} · {exp.category}</p>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <p className="text-sm font-medium text-foreground truncate">{exp.description}</p>
+                    {exp.isPayment && (
+                      <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${exp.paymentStatus === "A fazer" ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
+                        {exp.paymentStatus}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {exp.date} · {exp.isPayment ? "Pagamento" : exp.category}
+                    {exp.isPayment && exp.paymentStatus === "A fazer" && exp.dueDate && (
+                      <span className="text-amber-600 font-medium"> · venc. {new Date(exp.dueDate + "T12:00:00").toLocaleDateString("pt-BR")}</span>
+                    )}
+                  </p>
                   {exp.notes && <p className="text-[10px] text-muted-foreground/70 mt-0.5 truncate">{exp.notes}</p>}
                 </div>
                 <p className="text-sm font-mono font-semibold text-foreground shrink-0">{fmt(exp.amount)}</p>
@@ -1253,7 +1271,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                   type="button"
                   onClick={() => {
                     setEditingExpenseId(exp.id);
-                    setExpenseDraft({ description: exp.description, category: exp.category, amount: String(exp.amount) });
+                    setExpenseDraft({ description: exp.description, category: exp.category, amount: String(exp.amount), notes: exp.notes ?? "", isPayment: exp.isPayment ?? false, paymentStatus: exp.paymentStatus ?? "A fazer", dueDate: exp.dueDate ?? "" });
                     setAddingExpense(true);
                   }}
                   className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground shrink-0"
@@ -1497,11 +1515,58 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                   className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50 resize-none"
                 />
               </div>
+              {/* Payment toggle */}
+              <div className="flex items-center justify-between py-2 border-t border-border">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Registrar como pagamento</p>
+                  <p className="text-[10px] text-muted-foreground">Pagamentos geram indicadores no painel</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpenseDraft(d => ({ ...d, isPayment: !d.isPayment }))}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${expenseDraft.isPayment ? "bg-accent" : "bg-muted-foreground/30"}`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${expenseDraft.isPayment ? "translate-x-5" : "translate-x-0.5"}`} />
+                </button>
+              </div>
+              {expenseDraft.isPayment && (
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground block mb-2">Status do pagamento</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(["A fazer", "Realizado"] as const).map(s => (
+                        <button
+                          key={s} type="button"
+                          onClick={() => setExpenseDraft(d => ({ ...d, paymentStatus: s }))}
+                          className={`py-2 rounded-lg text-xs font-medium border transition-colors ${
+                            expenseDraft.paymentStatus === s
+                              ? s === "A fazer" ? "bg-amber-500 text-white border-amber-500" : "bg-green-600 text-white border-green-600"
+                              : "bg-muted text-muted-foreground border-border hover:border-accent/50"
+                          }`}
+                        >
+                          {s === "A fazer" ? "⏳ A fazer" : "✅ Realizado"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {expenseDraft.paymentStatus === "A fazer" && (
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground block mb-1.5">Vencimento</label>
+                      <input
+                        type="date"
+                        value={expenseDraft.dueDate}
+                        onChange={e => setExpenseDraft(d => ({ ...d, dueDate: e.target.value }))}
+                        className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="px-5 py-4 border-t border-border flex gap-3">
               <button
                 type="button"
-                onClick={() => { setAddingExpense(false); setEditingExpenseId(null); setExpenseDraft({ description: "", category: "Material", amount: "", notes: "" }); }}
+                onClick={() => { setAddingExpense(false); setEditingExpenseId(null); setExpenseDraft({ description: "", category: "Material", amount: "", notes: "", isPayment: false, paymentStatus: "A fazer", dueDate: "" }); }}
                 className="flex-1 py-2.5 bg-muted text-muted-foreground rounded-xl text-sm font-medium hover:bg-secondary transition-colors"
               >
                 Cancelar
@@ -1512,10 +1577,15 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                 onClick={() => {
                   const parsed = parseFloat(expenseDraft.amount.replace(/\./g, "").replace(",", "."));
                   if (!expenseDraft.description.trim() || isNaN(parsed)) return;
+                  const paymentFields = expenseDraft.isPayment ? {
+                    isPayment: true,
+                    paymentStatus: expenseDraft.paymentStatus,
+                    dueDate: expenseDraft.paymentStatus === "A fazer" ? expenseDraft.dueDate : undefined,
+                  } : { isPayment: false, paymentStatus: undefined, dueDate: undefined };
                   let nextExpenses: Expense[];
                   if (editingExpenseId !== null) {
                     nextExpenses = expenses.map(e => e.id === editingExpenseId
-                      ? { ...e, description: expenseDraft.description, category: expenseDraft.category, amount: parsed, notes: expenseDraft.notes || undefined }
+                      ? { ...e, description: expenseDraft.description, category: expenseDraft.category, amount: parsed, notes: expenseDraft.notes || undefined, ...paymentFields }
                       : e
                     );
                   } else {
@@ -1528,11 +1598,12 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                       category: expenseDraft.category,
                       amount: parsed,
                       notes: expenseDraft.notes || undefined,
+                      ...paymentFields,
                     }];
                   }
                   setExpenses(nextExpenses);
                   onUpdateProject?.({ ...project, milestones, expenses: nextExpenses, status, progress: computedProgress, phase: computedPhase });
-                  setExpenseDraft({ description: "", category: "Material", amount: "", notes: "" });
+                  setExpenseDraft({ description: "", category: "Material", amount: "", notes: "", isPayment: false, paymentStatus: "A fazer", dueDate: "" });
                   setEditingExpenseId(null);
                   setAddingExpense(false);
                 }}
