@@ -22,7 +22,7 @@ interface QuoteItem {
   amount: string;
 }
 
-type QuoteStatus = "Solicitado" | "Em análise" | "Aprovado" | "Rejeitado";
+type QuoteStatus = "Solicitado" | "Em análise" | "Aprovado" | "Cancelado";
 
 interface QuoteRecord {
   id: number;
@@ -37,6 +37,8 @@ interface QuoteRecord {
   startDate: string;
   endDate: string;
   status: QuoteStatus;
+  cancellationReason?: string;
+  analysisStartedAt?: string;
   milestones: Milestone[];
   createdAt: string;
 }
@@ -280,6 +282,25 @@ const MOCK_QUOTES: QuoteRecord[] = [
       { label: "Avaliação do orçamento", done: true, date: "Jun 2025", status: "Concluído", description: "Escopo aprovado pela cliente após ajustes.", deadline: "30/06/2025", completedAt: "28/06/2025", photos: [] },
     ],
     createdAt: "20/06/2025 11:00",
+  },
+  {
+    id: 104,
+    clientName: "Paulo Andrade",
+    phone: "",
+    description: "Studio 40m², Jardins",
+    items: [
+      { id: 1, title: "Demolição", description: "", amount: "6000" },
+      { id: 2, title: "Revestimentos", description: "", amount: "19000" },
+    ],
+    budgeted: 25000,
+    contractValue: 30000,
+    urgency: "Normal",
+    startDate: "",
+    endDate: "",
+    status: "Cancelado",
+    cancellationReason: "Cliente desistiu do projeto após análise do escopo.",
+    milestones: [],
+    createdAt: "01/06/2025 10:00",
   },
 ];
 
@@ -1714,7 +1735,7 @@ const quoteStatusColors: Record<QuoteStatus, string> = {
   "Solicitado": "bg-purple-100 text-purple-700",
   "Em análise": "bg-blue-100 text-blue-700",
   "Aprovado":   "bg-green-100 text-green-700",
-  "Rejeitado":  "bg-red-100 text-red-700",
+  "Cancelado":  "bg-red-100 text-red-700",
 };
 
 const urgencyColors: Record<string, string> = {
@@ -1804,8 +1825,26 @@ function QuoteDetail({
     ? ((quote.contractValue - quote.budgeted) / quote.contractValue) * 100
     : 0;
 
-  const handleStatusChange = (s: QuoteStatus) => {
-    onUpdateQuote({ ...quote, status: s });
+  const [cancellingQuote, setCancellingQuote] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+
+  const isReadOnly = quote.status === "Aprovado" || quote.status === "Cancelado";
+
+  const handleStartAnalysis = () => {
+    const now = new Date();
+    const ts = `${String(now.getDate()).padStart(2,"0")}/${String(now.getMonth()+1).padStart(2,"0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+    onUpdateQuote({ ...quote, status: "Em análise", analysisStartedAt: ts });
+  };
+
+  const handleApprove = () => {
+    onUpdateQuote({ ...quote, status: "Aprovado" });
+  };
+
+  const handleConfirmCancel = () => {
+    if (!cancelReason.trim()) return;
+    onUpdateQuote({ ...quote, status: "Cancelado", cancellationReason: cancelReason.trim() });
+    setCancellingQuote(false);
+    setCancelReason("");
   };
 
   return (
@@ -1818,6 +1857,11 @@ function QuoteDetail({
         <div>
           <p className="text-xs text-primary-foreground/60 font-mono uppercase tracking-wider">Orçamento</p>
           <h1 className="text-base font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>{quote.clientName}</h1>
+        </div>
+        <div className="ml-auto">
+          <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${quoteStatusColors[quote.status]}`}>
+            {quote.status}
+          </span>
         </div>
       </div>
 
@@ -1842,26 +1886,61 @@ function QuoteDetail({
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-5 pb-24 space-y-5">
-        {/* Status section */}
-        <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-          <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Status</p>
-          <div className="grid grid-cols-2 gap-2">
-            {(["Solicitado", "Em análise", "Aprovado", "Rejeitado"] as QuoteStatus[]).map(s => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => handleStatusChange(s)}
-                className={`py-2 px-3 rounded-lg text-xs font-medium border transition-colors ${
-                  quote.status === s
-                    ? quoteStatusColors[s] + " border-current"
-                    : "bg-muted text-muted-foreground border-border hover:border-accent/50"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
+        {/* Status actions — contextual by status */}
+        {quote.status === "Solicitado" && (
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Próximo passo</p>
+            <p className="text-sm text-muted-foreground">Este orçamento ainda não foi analisado.</p>
+            <button
+              type="button"
+              onClick={handleStartAnalysis}
+              className="w-full py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+            >
+              <ListChecks size={15} /> Iniciar análise
+            </button>
           </div>
-        </div>
+        )}
+
+        {quote.status === "Em análise" && (
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Ações</p>
+            {quote.analysisStartedAt && (
+              <p className="text-xs text-muted-foreground font-mono">Análise iniciada em {quote.analysisStartedAt}</p>
+            )}
+            {cancellingQuote ? (
+              <div className="rounded-xl border border-red-900/40 bg-red-900/10 p-4 space-y-3">
+                <p className="text-sm font-medium text-foreground">Motivo do cancelamento</p>
+                <textarea
+                  value={cancelReason}
+                  onChange={e => setCancelReason(e.target.value)}
+                  rows={3}
+                  placeholder="Descreva o motivo do cancelamento..."
+                  className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-red-400/30 border border-border text-foreground resize-none"
+                />
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => { setCancellingQuote(false); setCancelReason(""); }} className="flex-1 py-2 bg-muted text-muted-foreground rounded-lg text-xs font-medium hover:bg-secondary transition-colors">Voltar</button>
+                  <button type="button" onClick={handleConfirmCancel} disabled={!cancelReason.trim()} className="flex-1 py-2 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Confirmar cancelamento</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setCancellingQuote(true)} className="flex-1 py-2.5 bg-muted text-muted-foreground rounded-xl text-sm font-medium hover:bg-secondary transition-colors border border-border">
+                  Cancelar orçamento
+                </button>
+                <button type="button" onClick={handleApprove} className="flex-1 py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
+                  <CheckCircle size={15} /> Aprovar
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {quote.status === "Cancelado" && quote.cancellationReason && (
+          <div className="bg-red-900/10 border border-red-900/30 rounded-xl p-4 space-y-1.5">
+            <p className="text-xs text-red-400 font-mono uppercase tracking-wide font-medium">Motivo do cancelamento</p>
+            <p className="text-sm text-foreground">{quote.cancellationReason}</p>
+          </div>
+        )}
 
         {/* Items section */}
         <div className="bg-card border border-border rounded-xl p-4 space-y-3">
@@ -1887,36 +1966,6 @@ function QuoteDetail({
               </div>
             </div>
           )}
-        </div>
-
-        {/* Milestones section */}
-        <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-          <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Etapas</p>
-          {quote.milestones.map((m, i) => {
-            const cfg = STEP_STATUS_CONFIG[m.status];
-            return (
-              <div key={i} className="bg-muted rounded-xl px-4 py-3 flex items-center gap-3">
-                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.dot}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground leading-snug">{m.label}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${cfg.color}`}>{cfg.label}</span>
-                    {m.deadline && (
-                      <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-0.5">
-                        <CalendarClock size={9} /> {m.deadline}
-                      </span>
-                    )}
-                    {m.completedAt && (
-                      <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-0.5">
-                        <CalendarCheck size={9} /> {m.completedAt}
-                      </span>
-                    )}
-                  </div>
-                  {m.description && <p className="text-xs text-muted-foreground mt-1 leading-snug">{m.description}</p>}
-                </div>
-              </div>
-            );
-          })}
         </div>
 
         {/* Dates section */}
@@ -1945,14 +1994,18 @@ function QuoteDetail({
           </div>
         </div>
 
-        {/* Generate project button */}
+        {/* Gerar Obra — só aparece quando Aprovado e ainda não gerou obra */}
         {quote.status === "Aprovado" && (
-          <button
-            onClick={() => onGenerateProject(quote)}
-            className="w-full py-3.5 bg-accent text-accent-foreground rounded-xl font-medium hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 text-sm"
-          >
-            <HardHat size={16} /> Gerar Obra
-          </button>
+          <div className="bg-green-900/10 border border-green-800/30 rounded-xl p-4 space-y-3">
+            <p className="text-xs text-green-400 font-mono uppercase tracking-wide font-medium">Orçamento aprovado</p>
+            <p className="text-sm text-muted-foreground">Pronto para iniciar. Clique abaixo para criar a obra no sistema.</p>
+            <button
+              onClick={() => onGenerateProject(quote)}
+              className="w-full py-3 bg-accent text-accent-foreground rounded-xl font-medium hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 text-sm"
+            >
+              <HardHat size={16} /> Gerar Obra
+            </button>
+          </div>
         )}
       </div>
     </div>
