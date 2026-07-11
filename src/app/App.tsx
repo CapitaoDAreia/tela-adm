@@ -379,17 +379,26 @@ function ProgressBar({ value, color = "bg-accent" }: { value: number; color?: st
 
 // ─── Screen A: Dashboard ──────────────────────────────────────────────────────
 
+type DashFilter = "pagamentos" | "atrasadas" | "ativas" | "entregas" | null;
+
 function Dashboard({ projects, onOpenProject, onNewProject }: {
   projects: Project[];
   onOpenProject: (p: Project) => void;
   onNewProject: () => void;
 }) {
+  const [activeFilter, setActiveFilter] = useState<DashFilter>(null);
+  const [showAllPayments, setShowAllPayments] = useState(false);
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const parseDeadline = (d: string) => {
+    const [dd, mm, yyyy] = d.split("/").map(Number);
+    return new Date(yyyy, mm - 1, dd);
+  };
+
   const activeProjects = projects.filter(p => p.status === "Em andamento" || p.status === "Pausado");
 
-  // Pending payments across all active projects
   const pendingPayments = activeProjects.flatMap(p =>
     p.expenses
       .filter(e => e.isPayment && e.paymentStatus === "A fazer")
@@ -401,28 +410,70 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
   });
   const pendingPaymentsTotal = pendingPayments.reduce((s, e) => s + e.amount, 0);
 
-  // Overdue milestones across all active projects
-  const parseDeadline = (d: string) => {
-    const [dd, mm, yyyy] = d.split("/").map(Number);
-    return new Date(yyyy, mm - 1, dd);
-  };
-  const overdueMilestones = activeProjects.flatMap(p =>
-    p.milestones
-      .filter(m => m.deadline && m.status !== "Concluído" && m.status !== "Cancelado" && parseDeadline(m.deadline) < today)
-      .map(m => ({ ...m, projectName: p.name, projectId: p.id }))
+  const overdueProjectIds = new Set(
+    activeProjects
+      .filter(p => p.milestones.some(m => m.deadline && m.status !== "Concluído" && m.status !== "Cancelado" && parseDeadline(m.deadline) < today))
+      .map(p => p.id)
+  );
+  const overdueMilestoneCount = activeProjects.reduce((acc, p) =>
+    acc + p.milestones.filter(m => m.deadline && m.status !== "Concluído" && m.status !== "Cancelado" && parseDeadline(m.deadline) < today).length, 0
   );
 
-  // Projects ending within 30 days
   const in30Days = new Date(today); in30Days.setDate(today.getDate() + 30);
-  const nearDeadline = activeProjects.filter(p => {
+  const nearDeadlineProjects = activeProjects.filter(p => {
     if (!p.endDate || p.endDate === "–") return false;
     const [dd, mm, yyyy] = p.endDate.split("/").map(Number);
     const end = new Date(yyyy, mm - 1, dd);
     return end >= today && end <= in30Days;
   });
 
+  const filteredProjects = (() => {
+    switch (activeFilter) {
+      case "pagamentos": return projects.filter(p => p.expenses.some(e => e.isPayment && e.paymentStatus === "A fazer"));
+      case "atrasadas":  return projects.filter(p => overdueProjectIds.has(p.id));
+      case "ativas":     return activeProjects;
+      case "entregas":   return nearDeadlineProjects;
+      default:           return projects;
+    }
+  })();
+
+  const toggleFilter = (f: DashFilter) => setActiveFilter(prev => prev === f ? null : f);
+
+  const visiblePayments = showAllPayments ? pendingPayments : pendingPayments.slice(0, 2);
+
   const now = new Date();
   const monthLabel = now.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+
+  const indCard = (
+    id: DashFilter,
+    icon: React.ReactNode,
+    value: string,
+    label: string,
+    sub: string,
+    alertColors: { card: string; ring: string; val: string; lbl: string; sub: string } | null
+  ) => {
+    const isActive = activeFilter === id;
+    const hasAlert = alertColors !== null;
+    const neutral = {
+      card: "bg-muted border-border hover:border-border",
+      ring: "",
+      val: "text-foreground",
+      lbl: "text-muted-foreground",
+      sub: "text-muted-foreground",
+    };
+    const c = hasAlert ? alertColors : neutral;
+    return (
+      <button
+        onClick={() => toggleFilter(id)}
+        className={`flex-shrink-0 w-32 rounded-xl p-3 text-left border transition-all ${c.card} ${isActive ? `ring-2 ${c.ring}` : ""}`}
+      >
+        <div className="mb-1.5">{icon}</div>
+        <p className={`text-xl font-semibold leading-none mb-1 ${c.val}`}>{value}</p>
+        <p className={`text-[10px] font-medium leading-tight ${c.lbl}`}>{label}</p>
+        <p className={`text-[9px] mt-0.5 ${c.sub}`}>{sub}</p>
+      </button>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -441,177 +492,189 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 pb-24 space-y-6">
-        {/* Indicadores */}
-        <div className="grid grid-cols-2 gap-3">
-          <StatCard
-            icon={<DollarSign size={18} className="text-amber-600" />}
-            label="Pagamentos"
-            value={pendingPayments.length > 0 ? fmt(pendingPaymentsTotal) : "—"}
-            sub={pendingPayments.length > 0 ? `${pendingPayments.length} pendente${pendingPayments.length > 1 ? "s" : ""}` : "Nenhum pendente"}
-            color={pendingPayments.length > 0 ? "bg-amber-50" : "bg-muted"}
-          />
-          <StatCard
-            icon={<Building2 size={18} className="text-blue-600" />}
-            label="Obras ativas"
-            value={String(activeProjects.length)}
-            sub={`${projects.length} total`}
-            color="bg-blue-50"
-          />
-          <StatCard
-            icon={<CalendarClock size={18} className="text-red-500" />}
-            label="Etapas atrasadas"
-            value={overdueMilestones.length > 0 ? String(overdueMilestones.length) : "—"}
-            sub={overdueMilestones.length > 0 ? `em ${[...new Set(overdueMilestones.map(m => m.projectName))].length} obra${overdueMilestones.length > 1 ? "s" : ""}` : "Tudo em dia"}
-            color={overdueMilestones.length > 0 ? "bg-red-50" : "bg-muted"}
-          />
-          <StatCard
-            icon={<CalendarCheck size={18} className="text-purple-600" />}
-            label="Entregas próximas"
-            value={nearDeadline.length > 0 ? String(nearDeadline.length) : "—"}
-            sub={nearDeadline.length > 0 ? "nos próximos 30 dias" : "Sem entregas próximas"}
-            color={nearDeadline.length > 0 ? "bg-purple-50" : "bg-muted"}
-          />
+      <main className="max-w-2xl mx-auto pb-24">
+        {/* Indicator strip */}
+        <div
+          className="flex gap-3 overflow-x-auto py-4 px-4"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}
+        >
+          {indCard(
+            "pagamentos",
+            <DollarSign size={15} className={pendingPayments.length > 0 ? "text-amber-600" : "text-muted-foreground"} />,
+            pendingPayments.length > 0 ? fmt(pendingPaymentsTotal) : "—",
+            "Pagamentos",
+            pendingPayments.length > 0 ? `${pendingPayments.length} pendente${pendingPayments.length > 1 ? "s" : ""}` : "Nenhum pendente",
+            pendingPayments.length > 0 ? { card: "bg-amber-50 border-amber-200 hover:border-amber-300", ring: "ring-amber-300", val: "text-amber-900", lbl: "text-amber-800", sub: "text-amber-700" } : null
+          )}
+          {indCard(
+            "atrasadas",
+            <CalendarClock size={15} className={overdueMilestoneCount > 0 ? "text-red-500" : "text-muted-foreground"} />,
+            overdueMilestoneCount > 0 ? String(overdueMilestoneCount) : "—",
+            "Etapas atrasadas",
+            overdueMilestoneCount > 0 ? `em ${overdueProjectIds.size} obra${overdueProjectIds.size > 1 ? "s" : ""}` : "Tudo em dia",
+            overdueMilestoneCount > 0 ? { card: "bg-red-50 border-red-200 hover:border-red-300", ring: "ring-red-300", val: "text-red-900", lbl: "text-red-800", sub: "text-red-700" } : null
+          )}
+          {indCard(
+            "ativas",
+            <Building2 size={15} className="text-blue-600" />,
+            String(activeProjects.length),
+            "Obras ativas",
+            `${projects.length} total`,
+            { card: "bg-blue-50 border-blue-200 hover:border-blue-300", ring: "ring-blue-300", val: "text-blue-900", lbl: "text-blue-800", sub: "text-blue-700" }
+          )}
+          {indCard(
+            "entregas",
+            <CalendarCheck size={15} className={nearDeadlineProjects.length > 0 ? "text-purple-600" : "text-muted-foreground"} />,
+            nearDeadlineProjects.length > 0 ? String(nearDeadlineProjects.length) : "—",
+            "Entregas próximas",
+            nearDeadlineProjects.length > 0 ? "nos próximos 30 dias" : "Sem alertas",
+            nearDeadlineProjects.length > 0 ? { card: "bg-purple-50 border-purple-200 hover:border-purple-300", ring: "ring-purple-300", val: "text-purple-900", lbl: "text-purple-800", sub: "text-purple-700" } : null
+          )}
         </div>
 
-        {/* Feed: Pagamentos a fazer */}
-        {pendingPayments.length > 0 && (
-          <div>
-            <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-              <DollarSign size={14} className="text-amber-600" />
-              Pagamentos a fazer
-            </h2>
-            <div className="space-y-2">
-              {pendingPayments.map((pay, i) => {
-                const due = pay.dueDate ? new Date(pay.dueDate + "T12:00:00") : null;
-                const isOverdue = due && due < today;
-                const isDueToday = due && due.toDateString() === today.toDateString();
-                return (
+        <div className="px-4 space-y-5">
+          {/* Payment feed */}
+          {pendingPayments.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-foreground mb-2.5 flex items-center gap-2">
+                <DollarSign size={13} className="text-amber-600" />
+                Pagamentos a fazer
+              </h2>
+              <div className="space-y-2">
+                {visiblePayments.map((pay, i) => {
+                  const due = pay.dueDate ? new Date(pay.dueDate + "T12:00:00") : null;
+                  const isOverdue = due && due < today;
+                  const isDueToday = due && due.toDateString() === today.toDateString();
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => onOpenProject(pay.project)}
+                      className="w-full bg-card border border-border rounded-xl px-3.5 py-2.5 flex items-center gap-3 text-left hover:border-accent/40 hover:shadow-sm transition-all"
+                    >
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isOverdue ? "bg-red-100" : isDueToday ? "bg-amber-100" : "bg-muted"}`}>
+                        <DollarSign size={13} className={isOverdue ? "text-red-600" : isDueToday ? "text-amber-600" : "text-muted-foreground"} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{pay.description}</p>
+                        <p className="text-xs text-muted-foreground truncate">{pay.projectName}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-mono font-semibold text-foreground">{fmt(pay.amount)}</p>
+                        {due && (
+                          <p className={`text-[10px] font-mono ${isOverdue ? "text-red-500 font-semibold" : isDueToday ? "text-amber-600 font-semibold" : "text-muted-foreground"}`}>
+                            {isOverdue ? "Atrasado" : isDueToday ? "Hoje" : due.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+                {pendingPayments.length > 2 && !showAllPayments && (
                   <button
-                    key={i}
-                    onClick={() => onOpenProject(pay.project)}
-                    className="w-full bg-card border border-border rounded-xl px-4 py-3 flex items-center gap-3 text-left hover:border-accent/40 hover:shadow-sm transition-all"
+                    onClick={() => setShowAllPayments(true)}
+                    className="w-full text-xs text-accent font-medium py-1 hover:underline"
                   >
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isOverdue ? "bg-red-100" : isDueToday ? "bg-amber-100" : "bg-muted"}`}>
-                      <DollarSign size={15} className={isOverdue ? "text-red-600" : isDueToday ? "text-amber-600" : "text-muted-foreground"} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{pay.description}</p>
-                      <p className="text-xs text-muted-foreground truncate">{pay.projectName}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-mono font-semibold text-foreground">{fmt(pay.amount)}</p>
-                      {due && (
-                        <p className={`text-[10px] font-mono ${isOverdue ? "text-red-500 font-semibold" : isDueToday ? "text-amber-600 font-semibold" : "text-muted-foreground"}`}>
-                          {isOverdue ? "Atrasado" : isDueToday ? "Hoje" : due.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
-                        </p>
-                      )}
-                    </div>
+                    + {pendingPayments.length - 2} pagamento{pendingPayments.length - 2 > 1 ? "s" : ""} restante{pendingPayments.length - 2 > 1 ? "s" : ""}
                   </button>
-                );
-              })}
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Section header */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              Obras
+              {activeFilter && <span className="text-xs font-normal text-muted-foreground">· filtrado</span>}
+            </h2>
+            <div className="flex items-center gap-2">
+              {activeFilter && (
+                <button
+                  onClick={() => setActiveFilter(null)}
+                  className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-0.5"
+                >
+                  <X size={10} /> limpar
+                </button>
+              )}
+              <span className="text-xs text-muted-foreground font-mono">
+                {filteredProjects.length} projeto{filteredProjects.length !== 1 ? "s" : ""}
+              </span>
             </div>
           </div>
-        )}
 
-        {/* Etapas atrasadas (se houver) */}
-        {overdueMilestones.length > 0 && (
-          <div>
-            <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-              <CalendarClock size={14} className="text-red-500" />
-              Etapas atrasadas
-            </h2>
-            <div className="space-y-2">
-              {overdueMilestones.map((m, i) => (
-                <div key={i} className="bg-card border border-red-200 rounded-xl px-4 py-3 flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-red-500 shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{m.label}</p>
-                    <p className="text-xs text-muted-foreground">{m.projectName} · prazo {m.deadline}</p>
+          {/* Project cards */}
+          <div className="-mt-2 space-y-3 pb-2">
+            {filteredProjects.length === 0 ? (
+              <p className="text-center py-10 text-sm text-muted-foreground">Nenhuma obra neste filtro</p>
+            ) : filteredProjects.map(project => (
+              <button
+                key={project.id}
+                onClick={() => onOpenProject(project)}
+                className="w-full bg-card border border-border rounded-xl overflow-hidden text-left hover:shadow-md hover:border-accent/30 transition-all group"
+              >
+                <div className="relative h-28 overflow-hidden bg-muted">
+                  <img
+                    src={project.image}
+                    alt={project.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                  <div className="absolute bottom-2 left-3 right-3 flex items-end justify-between">
+                    <span className="text-white text-sm font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>
+                      {project.name}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[project.status]}`}>
+                      {project.status}
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Section title */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">Obras</h2>
-          <span className="text-xs text-muted-foreground font-mono">{projects.length} projetos</span>
-        </div>
-
-        {/* Project cards */}
-        <div className="-mt-2 space-y-3">
-          {projects.map(project => (
-            <button
-              key={project.id}
-              onClick={() => onOpenProject(project)}
-              className="w-full bg-card border border-border rounded-xl overflow-hidden text-left hover:shadow-md hover:border-accent/30 transition-all group"
-            >
-              <div className="relative h-28 overflow-hidden bg-muted">
-                <img
-                  src={project.image}
-                  alt={project.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                <div className="absolute bottom-2 left-3 right-3 flex items-end justify-between">
-                  <span className="text-white text-sm font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>
-                    {project.name}
-                  </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[project.status]}`}>
-                    {project.status}
-                  </span>
-                </div>
-              </div>
-              <div className="px-4 py-3">
-                {(() => {
-                  const prog = project.milestones.length > 0
-                    ? Math.round(project.milestones.filter(m => m.status === "Concluído").length / project.milestones.length * 100)
-                    : project.progress;
-                  return (
-                    <>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-muted-foreground">{project.phase}</span>
-                        <span className="text-xs font-mono font-medium text-foreground">{prog}%</span>
-                      </div>
-                      <ProgressBar
-                        value={prog}
-                        color={project.status === "Concluído" ? "bg-green-500" : project.status === "Pausado" ? "bg-yellow-400" : "bg-accent"}
-                      />
-                    </>
-                  );
-                })()}
-                <div className="flex items-center justify-between mt-2.5">
-                  <span className="text-xs text-muted-foreground">{project.client}</span>
-                  <span className="text-xs font-mono text-muted-foreground">
-                    {fmt(project.expenses.reduce((s, e) => s + e.amount, 0))} / {fmt(project.budgeted)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border">
-                  {project.startDate !== "–" ? (
-                    <>
-                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-mono">
-                        <CalendarDays size={10} /> {project.startDate}
-                      </span>
-                      <span className="text-muted-foreground/40 text-[10px]">→</span>
-                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-mono">
-                        <CalendarCheck size={10} /> {project.endDate}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-mono">
-                      <CalendarClock size={10} /> Orçamento válido até {project.quoteDeadline}
+                <div className="px-4 py-3">
+                  {(() => {
+                    const prog = project.milestones.length > 0
+                      ? Math.round(project.milestones.filter(m => m.status === "Concluído").length / project.milestones.length * 100)
+                      : project.progress;
+                    return (
+                      <>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-muted-foreground">{project.phase}</span>
+                          <span className="text-xs font-mono font-medium text-foreground">{prog}%</span>
+                        </div>
+                        <ProgressBar
+                          value={prog}
+                          color={project.status === "Concluído" ? "bg-green-500" : project.status === "Pausado" ? "bg-yellow-400" : "bg-accent"}
+                        />
+                      </>
+                    );
+                  })()}
+                  <div className="flex items-center justify-between mt-2.5">
+                    <span className="text-xs text-muted-foreground">{project.client}</span>
+                    <span className="text-xs font-mono text-muted-foreground">
+                      {fmt(project.expenses.reduce((s, e) => s + e.amount, 0))} / {fmt(project.budgeted)}
                     </span>
-                  )}
+                  </div>
+                  <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border">
+                    {project.startDate !== "–" ? (
+                      <>
+                        <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-mono">
+                          <CalendarDays size={10} /> {project.startDate}
+                        </span>
+                        <span className="text-muted-foreground/40 text-[10px]">→</span>
+                        <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-mono">
+                          <CalendarCheck size={10} /> {project.endDate}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground font-mono">
+                        <CalendarClock size={10} /> Orçamento válido até {project.quoteDeadline}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </button>
-          ))}
+              </button>
+            ))}
+          </div>
         </div>
       </main>
-
     </div>
   );
 }
