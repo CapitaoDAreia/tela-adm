@@ -8,7 +8,7 @@ import {
   CheckCircle, Circle, Upload, Phone, User, DollarSign,
   HardHat, Wrench, Home, CalendarDays, CalendarCheck, CalendarClock,
   ListChecks, ChevronRight, Trash2, PackagePlus, ClipboardList, FilePlus,
-  Printer, ShieldCheck, HardHatIcon, FileBarChart2
+  Printer, ShieldCheck, HardHatIcon, FileBarChart2, Pencil, RotateCcw, CheckCheck, Ban
 } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -48,7 +48,7 @@ interface QuoteRecord {
   createdAt: string;
 }
 
-type ProjectStatus = "Em andamento" | "Concluído" | "Pausado" | "Orçamento";
+type ProjectStatus = "Em andamento" | "Concluído" | "Pausado" | "Cancelada" | "Orçamento";
 
 interface Expense {
   id: number;
@@ -56,6 +56,7 @@ interface Expense {
   description: string;
   category: string;
   amount: number;
+  notes?: string;
 }
 
 type StepStatus = "Concluído" | "Em andamento" | "Pendente" | "Cancelado";
@@ -69,6 +70,11 @@ interface Milestone {
   deadline: string;
   completedAt: string;
   photos: string[];
+}
+
+interface ProjectHistoryEntry {
+  datetime: string;
+  description: string;
 }
 
 interface Project {
@@ -89,6 +95,8 @@ interface Project {
   expenses: Expense[];
   milestones: Milestone[];
   photos: { url: string; caption: string; date: string }[];
+  history?: ProjectHistoryEntry[];
+  cancelReason?: string;
 }
 
 // ─── Mock Data ───────────────────────────────────────────────────────────────
@@ -326,6 +334,7 @@ const statusColors: Record<ProjectStatus, string> = {
   "Em andamento": "bg-blue-100 text-blue-700",
   "Concluído": "bg-green-100 text-green-700",
   "Pausado": "bg-yellow-100 text-yellow-700",
+  "Cancelada": "bg-red-100 text-red-700",
   "Orçamento": "bg-purple-100 text-purple-700",
 };
 
@@ -333,6 +342,7 @@ const statusDot: Record<ProjectStatus, string> = {
   "Em andamento": "bg-blue-500",
   "Concluído": "bg-green-500",
   "Pausado": "bg-yellow-500",
+  "Cancelada": "bg-red-500",
   "Orçamento": "bg-purple-500",
 };
 
@@ -817,16 +827,75 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
     ? Math.round(milestones.filter(m => m.status === "Concluído").length / milestones.length * 100)
     : project.progress;
 
+  const computedPhase = (() => {
+    if (milestones.length === 0) return project.phase;
+    const inProgress = milestones.find(m => m.status === "Em andamento");
+    if (inProgress) return inProgress.label;
+    const next = milestones.find(m => m.status === "Pendente");
+    if (next) return next.label;
+    return "Concluída";
+  })();
+
   const propagate = (newMilestones: Milestone[]) => {
     const progress = newMilestones.length > 0
       ? Math.round(newMilestones.filter(m => m.status === "Concluído").length / newMilestones.length * 100)
       : project.progress;
-    onUpdateProject?.({ ...project, milestones: newMilestones, expenses, status, progress });
+    const inProg = newMilestones.find(m => m.status === "Em andamento");
+    const next = newMilestones.find(m => m.status === "Pendente");
+    const phase = newMilestones.length === 0 ? project.phase
+      : inProg ? inProg.label
+      : next ? next.label
+      : "Concluída";
+    onUpdateProject?.({ ...project, milestones: newMilestones, expenses, status, progress, phase });
   };
   const [editingStep, setEditingStep] = useState<Milestone | null>(null);
   const [creatingStep, setCreatingStep] = useState(false);
   const [addingExpense, setAddingExpense] = useState(false);
-  const [expenseDraft, setExpenseDraft] = useState({ description: "", category: "Material", amount: "" });
+  const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
+  const [expenseDraft, setExpenseDraft] = useState({ description: "", category: "Material", amount: "", notes: "" });
+  const [projectAction, setProjectAction] = useState<"concluir" | "cancelar" | "pausar" | null>(null);
+  const [projectActionReason, setProjectActionReason] = useState("");
+
+  const nowTs = () => {
+    const d = new Date();
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, "0");
+    const min = String(d.getMinutes()).padStart(2, "0");
+    return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+  };
+
+  const addProjectHistory = (p: Project, description: string): Project => ({
+    ...p,
+    history: [...(p.history ?? []), { datetime: nowTs(), description }],
+  });
+
+  const allConcluded = milestones.length > 0 && milestones.every(m => m.status === "Concluído" || m.status === "Cancelado");
+
+  const handleProjectAction = () => {
+    if (!projectAction) return;
+    let newStatus: ProjectStatus;
+    let historyMsg: string;
+    if (projectAction === "concluir") {
+      newStatus = "Concluído";
+      historyMsg = "Obra concluída.";
+    } else if (projectAction === "pausar") {
+      newStatus = "Pausado";
+      historyMsg = projectActionReason.trim() ? `Obra pausada — ${projectActionReason.trim()}` : "Obra pausada.";
+    } else {
+      newStatus = "Cancelada";
+      historyMsg = projectActionReason.trim() ? `Obra cancelada — ${projectActionReason.trim()}` : "Obra cancelada.";
+    }
+    const updated = addProjectHistory(
+      { ...project, milestones, expenses, status: newStatus, progress: computedProgress, phase: computedPhase, cancelReason: projectActionReason.trim() || undefined },
+      historyMsg
+    );
+    onUpdateProject?.(updated);
+    setStatus(newStatus);
+    setProjectAction(null);
+    setProjectActionReason("");
+  };
   const [showReport, setShowReport] = useState(false);
 
   const emptyStep: Milestone = {
@@ -879,22 +948,16 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
           <FileBarChart2 size={18} />
         </button>
         <div className="absolute bottom-4 left-4 right-4">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex items-end justify-between gap-3">
             <div>
               <p className="text-white/70 text-xs mb-0.5">{project.location}</p>
               <h2 className="text-white text-xl font-semibold leading-tight" style={{ fontFamily: "'DM Serif Display', serif" }}>
                 {project.name}
               </h2>
             </div>
-            <select
-              value={status}
-              onChange={e => setStatus(e.target.value as ProjectStatus)}
-              className="text-xs px-2 py-1.5 rounded-lg border-0 font-medium bg-white/90 text-foreground cursor-pointer"
-            >
-              {(["Em andamento", "Concluído", "Pausado", "Orçamento"] as ProjectStatus[]).map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium shrink-0 ${statusColors[status]}`}>
+              {status}
+            </span>
           </div>
         </div>
       </div>
@@ -945,7 +1008,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
         ))}
       </div>
 
-      <div className="px-4 py-5 max-w-2xl mx-auto pb-24">
+      <div className="px-4 py-5 max-w-2xl mx-auto pb-40">
         {/* TAB: Visão Geral */}
         {tab === "visao" && (
           <div className="space-y-5">
@@ -989,7 +1052,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                 </div>
                 <div className="mt-3">
                   <p className="text-xs text-muted-foreground font-mono mb-1">Fase atual</p>
-                  <p className="text-xs font-medium text-foreground leading-snug">{project.phase}</p>
+                  <p className="text-xs font-medium text-foreground leading-snug">{computedPhase}</p>
                 </div>
               </div>
             </div>
@@ -1184,8 +1247,20 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{exp.description}</p>
                   <p className="text-xs text-muted-foreground">{exp.date} · {exp.category}</p>
+                  {exp.notes && <p className="text-[10px] text-muted-foreground/70 mt-0.5 truncate">{exp.notes}</p>}
                 </div>
                 <p className="text-sm font-mono font-semibold text-foreground shrink-0">{fmt(exp.amount)}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingExpenseId(exp.id);
+                    setExpenseDraft({ description: exp.description, category: exp.category, amount: String(exp.amount) });
+                    setAddingExpense(true);
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground shrink-0"
+                >
+                  <Pencil size={13} />
+                </button>
               </div>
             ))}
           </div>
@@ -1219,6 +1294,103 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
         )}
       </div>
 
+
+      {/* Ações da obra (Concluir / Pausar / Cancelar) */}
+      {status !== "Concluído" && status !== "Cancelada" && (
+        <div className="fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-sm border-t border-border px-4 py-3">
+          {projectAction ? (
+            <div className="max-w-2xl mx-auto space-y-3">
+              <p className="text-sm font-medium text-foreground">
+                {projectAction === "concluir" && "Confirmar conclusão da obra?"}
+                {projectAction === "pausar" && "Confirmar pausa da obra?"}
+                {projectAction === "cancelar" && "Confirmar cancelamento da obra?"}
+              </p>
+              {(projectAction === "pausar" || projectAction === "cancelar") && (
+                <input
+                  type="text"
+                  placeholder={projectAction === "cancelar" ? "Motivo do cancelamento (opcional)" : "Motivo da pausa (opcional)"}
+                  value={projectActionReason}
+                  onChange={e => setProjectActionReason(e.target.value)}
+                  className="w-full bg-input-background rounded-lg px-3 py-2 text-sm border border-border text-foreground placeholder:text-muted-foreground/50 outline-none focus:ring-2 ring-accent/40"
+                />
+              )}
+              {projectAction === "concluir" && !allConcluded && (
+                <p className="text-xs text-amber-500">Ainda há etapas não concluídas. Conclua todas as etapas antes de finalizar a obra.</p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setProjectAction(null); setProjectActionReason(""); }}
+                  className="flex-1 py-2.5 bg-muted text-muted-foreground rounded-xl text-sm font-medium hover:bg-secondary transition-colors"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleProjectAction}
+                  disabled={projectAction === "concluir" && !allConcluded}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-2 ${
+                    projectAction === "concluir" ? "bg-green-600 text-white hover:bg-green-700"
+                    : projectAction === "pausar" ? "bg-yellow-500 text-white hover:bg-yellow-600"
+                    : "bg-red-600 text-white hover:bg-red-700"
+                  }`}
+                >
+                  {projectAction === "concluir" && <><CheckCheck size={15} /> Confirmar conclusão</>}
+                  {projectAction === "pausar" && "Confirmar pausa"}
+                  {projectAction === "cancelar" && <><Ban size={15} /> Confirmar cancelamento</>}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="max-w-2xl mx-auto flex gap-2">
+              {status !== "Concluído" && status !== "Pausado" && (
+                <button
+                  type="button"
+                  onClick={() => setProjectAction("pausar")}
+                  className="flex-1 py-2.5 bg-yellow-100 text-yellow-700 border border-yellow-200 rounded-xl text-xs font-medium hover:bg-yellow-200 transition-colors"
+                >
+                  Pausar obra
+                </button>
+              )}
+              {status === "Pausado" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = addProjectHistory(
+                      { ...project, milestones, expenses, status: "Em andamento", progress: computedProgress, phase: computedPhase },
+                      "Obra retomada."
+                    );
+                    onUpdateProject?.(updated);
+                    setStatus("Em andamento");
+                  }}
+                  className="flex-1 py-2.5 bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-medium hover:bg-blue-200 transition-colors"
+                >
+                  Retomar obra
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setProjectAction("cancelar")}
+                className="flex-1 py-2.5 bg-red-50 text-red-600 border border-red-200 rounded-xl text-xs font-medium hover:bg-red-100 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Ban size={13} /> Cancelar obra
+              </button>
+              <button
+                type="button"
+                onClick={() => setProjectAction("concluir")}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-colors border ${
+                  allConcluded
+                    ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
+                    : "bg-muted text-muted-foreground border-border cursor-not-allowed opacity-50"
+                }`}
+                title={!allConcluded ? "Conclua todas as etapas para liberar" : ""}
+              >
+                <CheckCheck size={13} /> Concluir obra
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Report modal */}
       {showReport && (
@@ -1265,9 +1437,9 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
             </div>
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <h3 className="text-base font-semibold text-foreground" style={{ fontFamily: "'DM Serif Display', serif" }}>
-                Nova Despesa
+                {editingExpenseId !== null ? "Editar Despesa" : "Nova Despesa"}
               </h3>
-              <button onClick={() => setAddingExpense(false)} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
+              <button onClick={() => { setAddingExpense(false); setEditingExpenseId(null); }} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
                 <X size={16} />
               </button>
             </div>
@@ -1316,11 +1488,21 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                   />
                 </div>
               </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1.5">Observação <span className="text-muted-foreground/50">(opcional)</span></label>
+                <textarea
+                  rows={2}
+                  placeholder="Ex: Nota fiscal nº 1234, fornecedor Roca..."
+                  value={expenseDraft.notes}
+                  onChange={e => setExpenseDraft({ ...expenseDraft, notes: e.target.value })}
+                  className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50 resize-none"
+                />
+              </div>
             </div>
             <div className="px-5 py-4 border-t border-border flex gap-3">
               <button
                 type="button"
-                onClick={() => setAddingExpense(false)}
+                onClick={() => { setAddingExpense(false); setEditingExpenseId(null); setExpenseDraft({ description: "", category: "Material", amount: "", notes: "" }); }}
                 className="flex-1 py-2.5 bg-muted text-muted-foreground rounded-xl text-sm font-medium hover:bg-secondary transition-colors"
               >
                 Cancelar
@@ -1331,21 +1513,30 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                 onClick={() => {
                   const parsed = parseFloat(expenseDraft.amount.replace(/\./g, "").replace(",", "."));
                   if (!expenseDraft.description.trim() || isNaN(parsed)) return;
-                  const now = new Date();
-                  const dateStr = now.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).replace(".", "");
-                  setExpenses(prev => [...prev, {
-                    id: Date.now(),
-                    date: dateStr,
-                    description: expenseDraft.description,
-                    category: expenseDraft.category,
-                    amount: parsed,
-                  }]);
-                  setExpenseDraft({ description: "", category: "Material", amount: "" });
+                  if (editingExpenseId !== null) {
+                    setExpenses(prev => prev.map(e => e.id === editingExpenseId
+                      ? { ...e, description: expenseDraft.description, category: expenseDraft.category, amount: parsed, notes: expenseDraft.notes || undefined }
+                      : e
+                    ));
+                  } else {
+                    const now = new Date();
+                    const dateStr = now.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).replace(".", "");
+                    setExpenses(prev => [...prev, {
+                      id: Date.now(),
+                      date: dateStr,
+                      description: expenseDraft.description,
+                      category: expenseDraft.category,
+                      amount: parsed,
+                      notes: expenseDraft.notes || undefined,
+                    }]);
+                  }
+                  setExpenseDraft({ description: "", category: "Material", amount: "", notes: "" });
+                  setEditingExpenseId(null);
                   setAddingExpense(false);
                 }}
                 className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/80 transition-colors disabled:opacity-40 disabled:pointer-events-none"
               >
-                Registrar despesa
+                {editingExpenseId !== null ? "Salvar alterações" : "Registrar despesa"}
               </button>
             </div>
           </div>
@@ -1995,6 +2186,11 @@ function QuoteDetail({
     onUpdateQuote(updated);
   };
 
+  const handleReopenAnalysis = () => {
+    const updated = addHistory({ ...quote, status: "Em análise" }, "Orçamento reaberto para análise.");
+    onUpdateQuote(updated);
+  };
+
   const handleConfirmCancel = () => {
     if (!cancelReason.trim()) return;
     const reason = cancelReason.trim();
@@ -2254,6 +2450,12 @@ function QuoteDetail({
               className="w-full py-3 bg-accent text-accent-foreground rounded-xl font-medium hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 text-sm"
             >
               <HardHat size={16} /> Gerar Obra
+            </button>
+            <button
+              onClick={handleReopenAnalysis}
+              className="w-full py-2.5 bg-transparent border border-border text-muted-foreground rounded-xl text-sm font-medium hover:border-accent/50 hover:text-foreground transition-colors flex items-center justify-center gap-2"
+            >
+              <RotateCcw size={14} /> Reabrir para análise
             </button>
           </div>
         )}
