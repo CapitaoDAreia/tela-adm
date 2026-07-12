@@ -8,7 +8,7 @@ import {
   CheckCircle, Circle, Upload, Phone, User, DollarSign,
   HardHat, Wrench, Home, CalendarDays, CalendarCheck, CalendarClock,
   ListChecks, ChevronRight, Trash2, PackagePlus, ClipboardList, FilePlus,
-  Printer, ShieldCheck, HardHatIcon, FileBarChart2, Pencil, RotateCcw, CheckCheck, Ban
+  Printer, ShieldCheck, HardHatIcon, FileBarChart2, Pencil, RotateCcw, CheckCheck, Ban, AlertTriangle
 } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -455,11 +455,11 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
     const isActive = activeFilter === id;
     const hasAlert = alertColors !== null;
     const neutral = {
-      card: "bg-muted border-border hover:border-border",
-      ring: "",
-      val: "text-foreground",
-      lbl: "text-muted-foreground",
-      sub: "text-muted-foreground",
+      card: "bg-green-50 border-green-200 hover:border-green-300",
+      ring: "ring-green-300",
+      val: "text-green-900",
+      lbl: "text-green-800",
+      sub: "text-green-700",
     };
     const c = hasAlert ? alertColors : neutral;
     return (
@@ -500,7 +500,7 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
         >
           {indCard(
             "pagamentos",
-            <DollarSign size={15} className={pendingPayments.length > 0 ? "text-amber-600" : "text-muted-foreground"} />,
+            <DollarSign size={15} className={pendingPayments.length > 0 ? "text-amber-600" : "text-green-600"} />,
             pendingPayments.length > 0 ? fmt(pendingPaymentsTotal) : "—",
             "Pagamentos",
             pendingPayments.length > 0 ? `${pendingPayments.length} pendente${pendingPayments.length > 1 ? "s" : ""}` : "Nenhum pendente",
@@ -508,7 +508,7 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
           )}
           {indCard(
             "atrasadas",
-            <CalendarClock size={15} className={overdueMilestoneCount > 0 ? "text-red-500" : "text-muted-foreground"} />,
+            <CalendarClock size={15} className={overdueMilestoneCount > 0 ? "text-red-500" : "text-green-600"} />,
             overdueMilestoneCount > 0 ? String(overdueMilestoneCount) : "—",
             "Etapas atrasadas",
             overdueMilestoneCount > 0 ? `em ${overdueProjectIds.size} obra${overdueProjectIds.size > 1 ? "s" : ""}` : "Tudo em dia",
@@ -524,7 +524,7 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
           )}
           {indCard(
             "entregas",
-            <CalendarCheck size={15} className={nearDeadlineProjects.length > 0 ? "text-purple-600" : "text-muted-foreground"} />,
+            <CalendarCheck size={15} className={nearDeadlineProjects.length > 0 ? "text-purple-600" : "text-green-600"} />,
             nearDeadlineProjects.length > 0 ? String(nearDeadlineProjects.length) : "—",
             "Entregas próximas",
             nearDeadlineProjects.length > 0 ? "nos próximos 30 dias" : "Sem alertas",
@@ -606,11 +606,21 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
           <div className="-mt-2 space-y-3 pb-2">
             {filteredProjects.length === 0 ? (
               <p className="text-center py-10 text-sm text-muted-foreground">Nenhuma obra neste filtro</p>
-            ) : filteredProjects.map(project => (
+            ) : filteredProjects.map(project => {
+              const hasOverdue = project.milestones.some(m =>
+                m.deadline && m.status !== "Concluído" && m.status !== "Cancelado" && parseDeadline(m.deadline) < today
+              );
+              const hasPendingPayment = project.expenses.some(e => e.isPayment && e.paymentStatus === "A fazer");
+              const alertLevel = hasOverdue ? "grave" : hasPendingPayment ? "medio" : null;
+              return (
               <button
                 key={project.id}
                 onClick={() => onOpenProject(project)}
-                className="w-full bg-card border border-border rounded-xl overflow-hidden text-left hover:shadow-md hover:border-accent/30 transition-all group"
+                className={`w-full bg-card rounded-xl overflow-hidden text-left hover:shadow-md transition-all group border ${
+                  alertLevel === "grave" ? "border-red-200 hover:border-red-300" :
+                  alertLevel === "medio" ? "border-amber-200 hover:border-amber-300" :
+                  "border-border hover:border-accent/30"
+                }`}
               >
                 <div className="relative h-28 overflow-hidden bg-muted">
                   <img
@@ -669,9 +679,22 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
                       </span>
                     )}
                   </div>
+                  {alertLevel && (
+                    <div className={`-mx-4 -mb-3 mt-3 px-4 py-1.5 flex items-center gap-1.5 ${
+                      alertLevel === "grave"
+                        ? "bg-red-50 border-t border-red-100"
+                        : "bg-amber-50 border-t border-amber-100"
+                    }`}>
+                      <AlertTriangle size={10} className={alertLevel === "grave" ? "text-red-500" : "text-amber-500"} />
+                      <span className={`text-[10px] font-medium ${alertLevel === "grave" ? "text-red-600" : "text-amber-600"}`}>
+                        {alertLevel === "grave" ? "Etapa atrasada" : "Pagamento pendente"}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
       </main>
@@ -684,7 +707,7 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
 type DetailTab = "visao" | "etapas" | "despesas" | "galeria";
 
 const STEP_STATUS_CONFIG: Record<StepStatus, { label: string; color: string; dot: string }> = {
-  "Concluído":    { label: "Concluído",    color: "bg-emerald-900/40 text-emerald-400 border-emerald-800", dot: "bg-emerald-400" },
+  "Concluído":    { label: "Concluído",    color: "bg-green-100 text-green-700 border-green-200",          dot: "bg-green-500" },
   "Em andamento": { label: "Em andamento", color: "bg-primary/20 text-primary border-primary/30",           dot: "bg-primary" },
   "Pendente":     { label: "Pendente",     color: "bg-muted text-muted-foreground border-border",           dot: "bg-muted-foreground" },
   "Cancelado":    { label: "Cancelado",    color: "bg-red-900/30 text-red-400 border-red-900",              dot: "bg-red-400" },
