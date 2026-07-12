@@ -336,6 +336,9 @@ const MOCK_QUOTES: QuoteRecord[] = [
 const fmt = (n: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(n);
 
+const fmtDate = (d: string) =>
+  d && d.includes("-") ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR") : d;
+
 const statusColors: Record<ProjectStatus, string> = {
   "Em andamento": "bg-blue-100 text-blue-700",
   "Concluído": "bg-green-100 text-green-700",
@@ -911,8 +914,33 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
                     ))}
                   </div>
                 )}
+                <input
+                  type="file"
+                  id="step-photos-input"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => {
+                    const files = Array.from(e.target.files || []);
+                    const newUrls: string[] = [];
+                    let loaded = 0;
+                    files.forEach(file => {
+                      const reader = new FileReader();
+                      reader.onload = ev => {
+                        newUrls.push(ev.target?.result as string);
+                        loaded++;
+                        if (loaded === files.length) {
+                          setDraft(d => ({ ...d, photos: [...d.photos, ...newUrls] }));
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    });
+                    e.target.value = "";
+                  }}
+                />
                 <button
                   type="button"
+                  onClick={() => document.getElementById("step-photos-input")?.click()}
                   className="w-full py-2.5 border border-dashed border-border rounded-lg text-xs text-muted-foreground hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2"
                 >
                   <Upload size={13} /> Anexar fotos / vídeos
@@ -1011,6 +1039,8 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
   const [status, setStatus] = useState<ProjectStatus>(project.status);
   const [milestones, setMilestones] = useState<Milestone[]>(project.milestones);
   const [expenses, setExpenses] = useState<Expense[]>(project.expenses);
+  const [photos, setPhotos] = useState(project.photos);
+  const [lightboxPhoto, setLightboxPhoto] = useState<{ url: string; caption: string; date: string } | null>(null);
 
   const computedProgress = milestones.length > 0
     ? Math.round(milestones.filter(m => m.status === "Concluído").length / milestones.length * 100)
@@ -1042,7 +1072,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
   const [addingExpense, setAddingExpense] = useState(false);
   const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
   const [expenseDraft, setExpenseDraft] = useState({ description: "", category: "Material", amount: "", notes: "", isPayment: false, paymentStatus: "A fazer" as "Realizado" | "A fazer", dueDate: "" });
-  const [projectAction, setProjectAction] = useState<"concluir" | "cancelar" | "pausar" | null>(null);
+  const [projectAction, setProjectAction] = useState<"concluir" | "cancelar" | "pausar" | "retomar" | null>(null);
   const [projectActionReason, setProjectActionReason] = useState("");
 
   const nowTs = () => {
@@ -1074,6 +1104,9 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
     } else if (projectAction === "pausar") {
       newStatus = "Pausado";
       historyMsg = projectActionReason.trim() ? `Obra pausada — ${projectActionReason.trim()}` : "Obra pausada.";
+    } else if (projectAction === "retomar") {
+      newStatus = "Em andamento";
+      historyMsg = "Obra retomada.";
     } else {
       newStatus = "Cancelada";
       historyMsg = projectActionReason.trim() ? `Obra cancelada — ${projectActionReason.trim()}` : "Obra cancelada.";
@@ -1387,12 +1420,12 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                       <span className={`text-[10px] px-1.5 py-0.5 rounded border ${cfg.color}`}>{cfg.label}</span>
                       {m.deadline && (
                         <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-0.5">
-                          <CalendarClock size={9} /> {m.deadline}
+                          <CalendarClock size={9} /> {fmtDate(m.deadline)}
                         </span>
                       )}
                       {m.completedAt && (
                         <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-0.5">
-                          <CalendarCheck size={9} /> {m.completedAt}
+                          <CalendarCheck size={9} /> {fmtDate(m.completedAt)}
                         </span>
                       )}
                     </div>
@@ -1471,31 +1504,90 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
         {/* TAB: Galeria */}
         {tab === "galeria" && (
           <div className="space-y-4">
-            {project.photos.length === 0 ? (
+            {photos.length === 0 ? (
               <div className="bg-card border border-border rounded-xl p-10 flex flex-col items-center gap-3 text-center">
                 <Camera size={32} className="text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">Nenhuma foto adicionada ainda</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
-                {project.photos.map((ph, i) => (
-                  <div key={i} className="bg-muted rounded-xl overflow-hidden border border-border">
+                {photos.map((ph, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setLightboxPhoto(ph)}
+                    className="bg-muted rounded-xl overflow-hidden border border-border text-left hover:border-accent/50 transition-colors"
+                  >
                     <img src={ph.url} alt={ph.caption} className="w-full h-32 object-cover" />
                     <div className="p-2">
                       <p className="text-xs font-medium text-foreground leading-snug">{ph.caption}</p>
                       <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{ph.date}</p>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
-            <button className="w-full py-3 border-2 border-dashed border-border rounded-xl text-sm text-muted-foreground hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2">
+            <input
+              type="file"
+              id="gallery-upload-input"
+              multiple
+              accept="image/*"
+              className="hidden"
+              onChange={e => {
+                const files = Array.from(e.target.files || []);
+                const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+                files.forEach(file => {
+                  const reader = new FileReader();
+                  reader.onload = ev => {
+                    const url = ev.target?.result as string;
+                    const now = new Date();
+                    const dateStr = `${String(now.getDate()).padStart(2,"0")} ${months[now.getMonth()]} ${now.getFullYear()}`;
+                    const newPhoto = { url, caption: file.name.replace(/\.[^.]+$/, ""), date: dateStr };
+                    setPhotos(prev => {
+                      const next = [...prev, newPhoto];
+                      onUpdateProject?.({ ...project, milestones, expenses, photos: next, status, progress: computedProgress, phase: computedPhase });
+                      return next;
+                    });
+                  };
+                  reader.readAsDataURL(file);
+                });
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => document.getElementById("gallery-upload-input")?.click()}
+              className="w-full py-3 border-2 border-dashed border-border rounded-xl text-sm text-muted-foreground hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2"
+            >
               <Upload size={16} /> Adicionar Fotos
             </button>
           </div>
         )}
       </div>
 
+
+      {/* Lightbox */}
+      {lightboxPhoto && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setLightboxPhoto(null)}
+        >
+          <div className="relative max-w-lg w-full" onClick={e => e.stopPropagation()}>
+            <img src={lightboxPhoto.url} alt={lightboxPhoto.caption} className="w-full rounded-xl object-contain max-h-[70vh]" />
+            <div className="mt-2 text-center">
+              <p className="text-white text-sm font-medium">{lightboxPhoto.caption}</p>
+              <p className="text-white/60 text-xs font-mono mt-0.5">{lightboxPhoto.date}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLightboxPhoto(null)}
+              className="absolute top-2 right-2 bg-black/60 rounded-full p-1.5 text-white hover:bg-black/80 transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Ações da obra (Concluir / Pausar / Cancelar) */}
       {status !== "Concluído" && status !== "Cancelada" && (
@@ -1506,6 +1598,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                 {projectAction === "concluir" && "Confirmar conclusão da obra?"}
                 {projectAction === "pausar" && "Confirmar pausa da obra?"}
                 {projectAction === "cancelar" && "Confirmar cancelamento da obra?"}
+                {projectAction === "retomar" && "Confirmar retomada da obra?"}
               </p>
               {(projectAction === "pausar" || projectAction === "cancelar") && (
                 <input
@@ -1537,11 +1630,13 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                   className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-2 ${
                     projectAction === "concluir" ? "bg-green-600 text-white hover:bg-green-700"
                     : projectAction === "pausar" ? "bg-yellow-500 text-white hover:bg-yellow-600"
+                    : projectAction === "retomar" ? "bg-blue-600 text-white hover:bg-blue-700"
                     : "bg-red-600 text-white hover:bg-red-700"
                   }`}
                 >
                   {projectAction === "concluir" && <><CheckCheck size={15} /> Confirmar conclusão</>}
                   {projectAction === "pausar" && "Confirmar pausa"}
+                  {projectAction === "retomar" && <><RotateCcw size={15} /> Retomar obra</>}
                   {projectAction === "cancelar" && <><Ban size={15} /> Confirmar cancelamento</>}
                 </button>
               </div>
@@ -1560,14 +1655,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
               {status === "Pausado" && (
                 <button
                   type="button"
-                  onClick={() => {
-                    const updated = addProjectHistory(
-                      { ...project, milestones, expenses, status: "Em andamento", progress: computedProgress, phase: computedPhase },
-                      "Obra retomada."
-                    );
-                    onUpdateProject?.(updated);
-                    setStatus("Em andamento");
-                  }}
+                  onClick={() => setProjectAction("retomar")}
                   className="flex-1 py-2.5 bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-medium hover:bg-blue-200 transition-colors"
                 >
                   Retomar obra
@@ -1778,7 +1866,8 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                     );
                   } else {
                     const now = new Date();
-                    const dateStr = now.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).replace(".", "");
+                    const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+                    const dateStr = `${String(now.getDate()).padStart(2,"0")} ${months[now.getMonth()]} ${now.getFullYear()}`;
                     nextExpenses = [...expenses, {
                       id: Date.now(),
                       date: dateStr,
@@ -1857,8 +1946,8 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
       budgeted: totalValue,
       contractValue: contractVal,
       urgency: form.urgency,
-      startDate: form.startDate,
-      endDate: form.endDate,
+      startDate: form.startDate ? new Date(form.startDate + "T12:00:00").toLocaleDateString("pt-BR") : "",
+      endDate: form.endDate ? new Date(form.endDate + "T12:00:00").toLocaleDateString("pt-BR") : "",
       status: "Solicitado",
       history: [{ datetime: createdAtStr, description: "Orçamento criado." }],
       createdAt: createdAtStr,
@@ -2156,7 +2245,11 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
                 type="text"
                 placeholder="Ex: 104.000"
                 value={form.contractValue}
-                onChange={e => setForm({ ...form, contractValue: e.target.value })}
+                onChange={e => {
+                  const raw = e.target.value.replace(/\D/g, "");
+                  if (!raw) { setForm({ ...form, contractValue: "" }); return; }
+                  setForm({ ...form, contractValue: new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(parseInt(raw, 10)) });
+                }}
                 className="w-full bg-input-background rounded-lg pl-9 pr-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border placeholder:text-muted-foreground/50 font-mono"
               />
             </div>
