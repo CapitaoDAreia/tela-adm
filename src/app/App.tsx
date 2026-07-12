@@ -1061,6 +1061,8 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
   });
 
   const allConcluded = milestones.length > 0 && milestones.every(m => m.status === "Concluído" || m.status === "Cancelado");
+  const hasPendingPayments = expenses.some(e => e.isPayment && e.paymentStatus === "A fazer");
+  const canConclude = allConcluded && !hasPendingPayments;
 
   const handleProjectAction = () => {
     if (!projectAction) return;
@@ -1517,6 +1519,9 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
               {projectAction === "concluir" && !allConcluded && (
                 <p className="text-xs text-amber-500">Ainda há etapas não concluídas. Conclua todas as etapas antes de finalizar a obra.</p>
               )}
+              {projectAction === "concluir" && allConcluded && hasPendingPayments && (
+                <p className="text-xs text-amber-500">Ainda há pagamentos pendentes. Quite todos os pagamentos antes de finalizar a obra.</p>
+              )}
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -1528,7 +1533,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                 <button
                   type="button"
                   onClick={handleProjectAction}
-                  disabled={projectAction === "concluir" && !allConcluded}
+                  disabled={projectAction === "concluir" && !canConclude}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-2 ${
                     projectAction === "concluir" ? "bg-green-600 text-white hover:bg-green-700"
                     : projectAction === "pausar" ? "bg-yellow-500 text-white hover:bg-yellow-600"
@@ -1579,11 +1584,11 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                 type="button"
                 onClick={() => setProjectAction("concluir")}
                 className={`flex-1 py-2.5 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-colors border ${
-                  allConcluded
+                  canConclude
                     ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
                     : "bg-muted text-muted-foreground border-border cursor-not-allowed opacity-50"
                 }`}
-                title={!allConcluded ? "Conclua todas as etapas para liberar" : ""}
+                title={!allConcluded ? "Conclua todas as etapas para liberar" : hasPendingPayments ? "Quite os pagamentos pendentes para liberar" : ""}
               >
                 <CheckCheck size={13} /> Concluir obra
               </button>
