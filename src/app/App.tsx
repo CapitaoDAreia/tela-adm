@@ -1317,8 +1317,8 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                     <p className="text-xs text-muted-foreground font-mono">Financeiro</p>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${
                       isHealthy
-                        ? "bg-emerald-900/40 text-emerald-400 border-emerald-800"
-                        : "bg-red-900/30 text-red-400 border-red-900"
+                        ? "bg-green-100 text-green-700 border-green-200"
+                        : "bg-red-100 text-red-600 border-red-200"
                     }`}>
                       {isHealthy ? "Margem saudável" : "Margem comprimida"}
                     </span>
