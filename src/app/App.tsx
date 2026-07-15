@@ -713,7 +713,7 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
 
 // ─── Screen B: Project Detail ─────────────────────────────────────────────────
 
-type DetailTab = "visao" | "etapas" | "despesas" | "galeria";
+type DetailTab = "visao" | "etapas" | "despesas" | "galeria" | "cronograma";
 
 const STEP_STATUS_CONFIG: Record<StepStatus, { label: string; color: string; dot: string }> = {
   "Concluído":    { label: "Concluído",    color: "bg-green-100 text-green-700 border-green-200",          dot: "bg-green-500" },
@@ -1425,10 +1425,11 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
       {/* Tabs */}
       <div className="flex border-b border-border bg-card overflow-x-auto scrollbar-hide">
         {([
-          { id: "visao",    label: "Visão Geral", icon: <LayoutDashboard size={14} /> },
-          { id: "etapas",   label: "Etapas",      icon: <ListChecks size={14} /> },
-          { id: "despesas", label: "Despesas",     icon: <Receipt size={14} /> },
-          { id: "galeria",  label: "Galeria",      icon: <Image size={14} /> },
+          { id: "visao",       label: "Visão Geral",  icon: <LayoutDashboard size={14} /> },
+          { id: "etapas",      label: "Etapas",       icon: <ListChecks size={14} /> },
+          { id: "cronograma",  label: "Cronograma",   icon: <CalendarDays size={14} /> },
+          { id: "despesas",    label: "Despesas",      icon: <Receipt size={14} /> },
+          { id: "galeria",     label: "Galeria",       icon: <Image size={14} /> },
         ] as { id: DetailTab; label: string; icon: React.ReactNode }[]).map(t => (
           <button
             key={t.id}
@@ -1665,6 +1666,111 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
             })}
           </div>
         )}
+
+        {/* TAB: Cronograma */}
+        {tab === "cronograma" && (() => {
+          const parseD = (d: string): Date | null => {
+            if (!d) return null;
+            if (d.includes("/")) {
+              const [dd, mm, yyyy] = d.split("/").map(Number);
+              return new Date(yyyy, mm - 1, dd);
+            }
+            if (d.includes("-")) return new Date(d + "T12:00:00");
+            return null;
+          };
+          const allDates = milestones.flatMap(m => [
+            parseD(m.startDate ?? ""), parseD(m.deadline), parseD(m.completedAt)
+          ]).filter(Boolean) as Date[];
+          const projStart = parseD(project.startDate) ?? (allDates.length ? new Date(Math.min(...allDates.map(d => d.getTime()))) : new Date());
+          const projEnd   = parseD(project.endDate)   ?? (allDates.length ? new Date(Math.max(...allDates.map(d => d.getTime()))) : new Date());
+          const span = projEnd.getTime() - projStart.getTime() || 1;
+          const pct = (d: Date) => Math.min(100, Math.max(0, ((d.getTime() - projStart.getTime()) / span) * 100));
+          const today = new Date();
+          const todayPct = pct(today);
+          const STATUS_COLORS: Record<StepStatus, string> = {
+            "Concluído":   "bg-emerald-500",
+            "Em andamento": "bg-accent",
+            "Pendente":    "bg-muted-foreground/40",
+            "Cancelado":   "bg-red-500/50",
+          };
+          const months: string[] = [];
+          const cur = new Date(projStart.getFullYear(), projStart.getMonth(), 1);
+          while (cur <= projEnd) {
+            months.push(cur.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }));
+            cur.setMonth(cur.getMonth() + 1);
+          }
+          return (
+            <div className="p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">Cronograma de etapas</h3>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  {project.startDate} → {project.endDate}
+                </span>
+              </div>
+
+              {/* Régua de meses */}
+              <div className="relative h-5 border-b border-border">
+                {months.map((m, i) => (
+                  <span
+                    key={i}
+                    className="absolute text-[9px] text-muted-foreground font-mono -translate-x-1/2"
+                    style={{ left: `${(i / Math.max(months.length - 1, 1)) * 100}%`, top: 0 }}
+                  >{m}</span>
+                ))}
+              </div>
+
+              {/* Barras das etapas */}
+              <div className="space-y-2.5">
+                {milestones.map((m, i) => {
+                  const start = parseD(m.startDate ?? "") ?? parseD(m.deadline);
+                  const end   = parseD(m.deadline) ?? start;
+                  if (!start || !end) return null;
+                  const left  = pct(start);
+                  const width = Math.max(1, pct(end) - left);
+                  const cfg = STEP_STATUS_CONFIG[m.status];
+                  return (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-32 shrink-0 text-right">
+                        <span className="text-[11px] text-foreground leading-tight line-clamp-1">{m.label}</span>
+                      </div>
+                      <div className="relative flex-1 h-6">
+                        {/* trilho */}
+                        <div className="absolute inset-y-0 left-0 right-0 rounded-full bg-muted/50" />
+                        {/* barra */}
+                        <div
+                          className={`absolute inset-y-1 rounded-full ${STATUS_COLORS[m.status]} transition-all`}
+                          style={{ left: `${left}%`, width: `${width}%` }}
+                          title={`${fmtDate(m.startDate ?? m.deadline)} → ${fmtDate(m.deadline)}`}
+                        />
+                        {/* linha hoje */}
+                        {todayPct >= 0 && todayPct <= 100 && (
+                          <div className="absolute inset-y-0 w-px bg-red-500/70" style={{ left: `${todayPct}%` }} />
+                        )}
+                      </div>
+                      <div className="w-16 shrink-0">
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded border ${cfg.color}`}>{cfg.label}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Legenda */}
+              <div className="flex flex-wrap gap-3 pt-2 border-t border-border">
+                {(["Concluído","Em andamento","Pendente","Cancelado"] as StepStatus[]).map(s => (
+                  <div key={s} className="flex items-center gap-1.5">
+                    <div className={`w-3 h-2 rounded-full ${STATUS_COLORS[s]}`} />
+                    <span className="text-[10px] text-muted-foreground">{s}</span>
+                  </div>
+                ))}
+                <div className="flex items-center gap-1.5">
+                  <div className="w-px h-3 bg-red-500/70" />
+                  <span className="text-[10px] text-muted-foreground">Hoje</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* TAB: Despesas */}
         {tab === "despesas" && (
