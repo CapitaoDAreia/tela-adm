@@ -363,6 +363,16 @@ const fmt = (n: number) =>
 const fmtDate = (d: string) =>
   d && d.includes("-") ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR") : d;
 
+const parseAnyDate = (d: string): Date | null => {
+  if (!d) return null;
+  if (d.includes("/")) {
+    const [dd, mm, yyyy] = d.split("/").map(Number);
+    return new Date(yyyy, mm - 1, dd);
+  }
+  if (d.includes("-")) return new Date(d + "T12:00:00");
+  return null;
+};
+
 const statusColors: Record<ProjectStatus, string> = {
   "Em andamento": "bg-blue-100 text-blue-700",
   "Concluído": "bg-green-100 text-green-700",
@@ -453,6 +463,31 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
     const end = new Date(yyyy, mm - 1, dd);
     return end >= today && end <= in30Days;
   });
+
+  const in2Days = new Date(today); in2Days.setDate(today.getDate() + 2);
+
+  type MatAlerta = {
+    projectName: string; projectId: number;
+    milestoneName: string; startDate: string; orderByDate: Date;
+    pendingItems: string[];
+  };
+  const materiaisUrgentes: MatAlerta[] = activeProjects.flatMap(p =>
+    p.milestones
+      .filter(m => m.startDate && (m.materials ?? []).some(mat => mat.status === "Pendente"))
+      .flatMap(m => {
+        const startD = parseAnyDate(m.startDate!);
+        if (!startD) return [];
+        const orderBy = new Date(startD);
+        orderBy.setDate(orderBy.getDate() - 2);
+        if (orderBy > in2Days || startD < today) return [];
+        return [{
+          projectName: p.name, projectId: p.id,
+          milestoneName: m.label, startDate: m.startDate!,
+          orderByDate: orderBy,
+          pendingItems: (m.materials ?? []).filter(mat => mat.status === "Pendente").map(mat => mat.description),
+        }];
+      })
+  );
 
   const filteredProjects = (() => {
     switch (activeFilter) {
@@ -551,15 +586,51 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
           )}
           {indCard(
             "entregas",
-            <CalendarCheck size={15} className={nearDeadlineProjects.length > 0 ? "text-purple-600" : "text-green-600"} />,
-            nearDeadlineProjects.length > 0 ? String(nearDeadlineProjects.length) : "—",
-            "Entregas próximas",
-            nearDeadlineProjects.length > 0 ? "nos próximos 30 dias" : "Sem alertas",
-            nearDeadlineProjects.length > 0 ? { card: "bg-purple-50 border-purple-200 hover:border-purple-300", ring: "ring-purple-300", val: "text-purple-900", lbl: "text-purple-800", sub: "text-purple-700" } : null
+            <PackagePlus size={15} className={materiaisUrgentes.length > 0 ? "text-amber-600" : "text-green-600"} />,
+            materiaisUrgentes.length > 0 ? String(materiaisUrgentes.length) : "—",
+            "Mat. a pedir",
+            materiaisUrgentes.length > 0 ? `${materiaisUrgentes.length} etapa${materiaisUrgentes.length > 1 ? "s" : ""} urgente${materiaisUrgentes.length > 1 ? "s" : ""}` : "Nenhum urgente",
+            materiaisUrgentes.length > 0 ? { card: "bg-amber-50 border-amber-200 hover:border-amber-300", ring: "ring-amber-300", val: "text-amber-900", lbl: "text-amber-800", sub: "text-amber-700" } : null
           )}
         </div>
 
         <div className="px-4 space-y-5">
+          {/* Alerta D-2: Materiais a pedir */}
+          {materiaisUrgentes.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-foreground mb-2.5 flex items-center gap-2">
+                <PackagePlus size={14} className="text-amber-500" />
+                Materiais a pedir
+              </h2>
+              <div className="space-y-2">
+                {materiaisUrgentes.map((alerta, i) => {
+                  const isOverdue = alerta.orderByDate < today;
+                  return (
+                    <div key={i} className={`rounded-xl border p-3.5 ${isOverdue ? "border-red-800/40 bg-red-900/10" : "border-amber-800/40 bg-amber-900/10"}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">{alerta.milestoneName}</p>
+                          <p className="text-[11px] text-muted-foreground">{alerta.projectName}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className={`text-[10px] font-semibold ${isOverdue ? "text-red-400" : "text-amber-400"}`}>
+                            {isOverdue ? "Prazo esgotado" : `Pedir até ${alerta.orderByDate.toLocaleDateString("pt-BR")}`}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">Início: {fmtDate(alerta.startDate)}</p>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {alerta.pendingItems.map((item, j) => (
+                          <span key={j} className="text-[10px] px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border">{item}</span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Payment feed */}
           {pendingPayments.length > 0 && (
             <div>
