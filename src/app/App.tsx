@@ -716,6 +716,18 @@ const STEP_STATUS_CONFIG: Record<StepStatus, { label: string; color: string; dot
   "Cancelado":    { label: "Cancelado",    color: "bg-red-900/30 text-red-400 border-red-900",              dot: "bg-red-400" },
 };
 
+const PHASE_TEMPLATES: { label: string; description: string }[] = [
+  { label: "Demolição e limpeza",          description: "Remoção de revestimentos existentes, demolição de paredes não estruturais e limpeza geral do ambiente." },
+  { label: "Instalações hidráulicas",      description: "Substituição ou instalação de tubulação de água fria, quente e esgoto." },
+  { label: "Instalações elétricas",        description: "Passagem de fiação, instalação de quadro de distribuição e pontos de tomada/iluminação." },
+  { label: "Alvenaria e divisórias",       description: "Construção de novas divisórias em alvenaria ou drywall conforme projeto." },
+  { label: "Revestimentos e piso",         description: "Assentamento de porcelanato, cerâmica, pedras ou piso laminado, incluindo rodapés." },
+  { label: "Forro e gesso",               description: "Instalação de forro de gesso, sancas, molduras e reboco fino nas paredes." },
+  { label: "Pintura",                      description: "Aplicação de massa corrida, selador e tinta látex premium em paredes e teto." },
+  { label: "Marcenaria e esquadrias",      description: "Instalação de móveis planejados, portas, janelas e demais esquadrias." },
+  { label: "Acabamentos e entrega",        description: "Instalação de louças, metais, luminárias, rodapés e limpeza fina para entrega." },
+];
+
 function StepModal({ step, onClose, onSave, isNew = false }: {
   step: Milestone;
   onClose: () => void;
@@ -723,6 +735,7 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
   isNew?: boolean;
 }) {
   const [draft, setDraft] = useState<Milestone>({ ...step });
+  const [pickedTemplate, setPickedTemplate] = useState<string | null>(null);
   const [workerNote, setWorkerNote] = useState("");
   const [pendingStatus, setPendingStatus] = useState<StepStatus | null>(null);
   const [extendingDeadline, setExtendingDeadline] = useState(false);
@@ -779,14 +792,47 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
         </div>
 
         <div className="px-5 py-4 space-y-5">
+          {/* Templates de etapa (apenas se novo) */}
+          {isNew && (
+            <div className="space-y-3">
+              <label className="text-xs font-medium text-muted-foreground block">Usar modelo padrão</label>
+              <div className="flex flex-wrap gap-2">
+                {PHASE_TEMPLATES.map(t => (
+                  <button
+                    key={t.label}
+                    type="button"
+                    onClick={() => {
+                      if (pickedTemplate === t.label) {
+                        setPickedTemplate(null);
+                        setDraft(d => ({ ...d, label: "", description: "" }));
+                      } else {
+                        setPickedTemplate(t.label);
+                        setDraft(d => ({ ...d, label: t.label, description: t.description }));
+                      }
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                      pickedTemplate === t.label
+                        ? "bg-accent text-accent-foreground border-accent"
+                        : "bg-muted/60 text-muted-foreground border-border hover:border-accent/50 hover:text-foreground"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Nome (apenas se novo) */}
           {isNew && (
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1.5">Nome da etapa</label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1.5">
+                {pickedTemplate ? "Nome da etapa" : "Ou nomeie uma etapa personalizada"}
+              </label>
               <input
                 type="text"
                 value={draft.label}
-                onChange={e => setDraft({ ...draft, label: e.target.value })}
+                onChange={e => { setPickedTemplate(null); setDraft({ ...draft, label: e.target.value }); }}
                 placeholder="Ex: Instalações hidráulicas"
                 className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50"
               />
