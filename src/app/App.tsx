@@ -70,6 +70,7 @@ interface Milestone {
   date: string;
   status: StepStatus;
   description: string;
+  startDate?: string;
   deadline: string;
   completedAt: string;
   photos: string[];
@@ -839,6 +840,22 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
             </div>
           )}
 
+          {/* Datas — início e prazo, lado a lado */}
+          <div className={isNew ? "grid grid-cols-2 gap-3" : "space-y-2"}>
+            {isNew && (
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground block flex items-center gap-1.5">
+                  <CalendarDays size={11} className="text-accent" /> Data de início
+                </label>
+                <input
+                  type="date"
+                  value={draft.startDate ?? ""}
+                  onChange={e => setDraft({ ...draft, startDate: e.target.value })}
+                  className="w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+                />
+              </div>
+            )}
+
           {/* Prazo — definido no planejamento, fora das seções */}
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground block flex items-center gap-1.5">
@@ -890,6 +907,7 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
               </div>
             )}
           </div>
+          </div>{/* fim grid datas */}
 
           {/* Conclusão real — chip read-only, preenchido automaticamente ao marcar Concluído */}
           {draft.status === "Concluído" && draft.completedAt && (
@@ -1170,7 +1188,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
 
   const emptyStep: Milestone = {
     label: "", done: false, date: "", status: "Pendente",
-    description: "", deadline: "", completedAt: "", photos: [],
+    description: "", startDate: "", deadline: "", completedAt: "", photos: [],
   };
 
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
@@ -1464,6 +1482,11 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded border ${cfg.color}`}>{cfg.label}</span>
+                      {m.startDate && (
+                        <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-0.5">
+                          <CalendarDays size={9} /> {fmtDate(m.startDate)}
+                        </span>
+                      )}
                       {m.deadline && (
                         <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-0.5">
                           <CalendarClock size={9} /> {fmtDate(m.deadline)}
@@ -3152,6 +3175,7 @@ export default function App() {
         date: "",
         status: "Pendente" as StepStatus,
         description: item.description,
+        startDate: "",
         deadline: "",
         completedAt: "",
         photos: [],
