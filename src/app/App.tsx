@@ -78,6 +78,7 @@ interface Milestone {
   contractorPhone?: string;
   contractorValue?: number;
   contractorStatus?: "Não contratado" | "Contratado" | "Em execução" | "Concluído";
+  materials?: { id: number; description: string; status: "Pendente" | "Pedido" | "Recebido" }[];
 }
 
 interface ProjectHistoryEntry {
@@ -1001,6 +1002,86 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
                     <option>Concluído</option>
                   </select>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Seção: Materiais ── */}
+          <div className="rounded-xl border border-border bg-muted/40 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/60">
+              <div className="flex items-center gap-2">
+                <PackagePlus size={13} className="text-muted-foreground" />
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Materiais</span>
+              </div>
+              {draft.startDate && (
+                <span className="text-[10px] text-amber-500 font-medium">
+                  Pedir até {(() => {
+                    const d = new Date(draft.startDate + "T12:00:00");
+                    d.setDate(d.getDate() - 2);
+                    return d.toLocaleDateString("pt-BR");
+                  })()}
+                </span>
+              )}
+            </div>
+            <div className="px-4 py-3 space-y-2">
+              {(draft.materials ?? []).map((mat, i) => (
+                <div key={mat.id} className="flex items-center gap-2">
+                  <select
+                    value={mat.status}
+                    onChange={e => {
+                      const mats = [...(draft.materials ?? [])];
+                      mats[i] = { ...mat, status: e.target.value as typeof mat.status };
+                      setDraft({ ...draft, materials: mats });
+                    }}
+                    className={`text-[10px] px-2 py-1 rounded border outline-none shrink-0 ${
+                      mat.status === "Recebido" ? "bg-emerald-900/30 text-emerald-400 border-emerald-800/40" :
+                      mat.status === "Pedido"   ? "bg-blue-900/30 text-blue-400 border-blue-800/40" :
+                      "bg-muted text-muted-foreground border-border"
+                    }`}
+                  >
+                    <option>Pendente</option>
+                    <option>Pedido</option>
+                    <option>Recebido</option>
+                  </select>
+                  <span className="text-sm text-foreground flex-1">{mat.description}</span>
+                  <button
+                    type="button"
+                    onClick={() => setDraft({ ...draft, materials: (draft.materials ?? []).filter((_, j) => j !== i) })}
+                    className="p-1 text-muted-foreground hover:text-red-400 transition-colors"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+              <div className="flex gap-2 pt-1">
+                <input
+                  type="text"
+                  id="mat-input"
+                  placeholder="Ex: Porcelanato 60×60"
+                  className="flex-1 bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50"
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      const input = e.currentTarget;
+                      if (!input.value.trim()) return;
+                      const newMat = { id: Date.now(), description: input.value.trim(), status: "Pendente" as const };
+                      setDraft({ ...draft, materials: [...(draft.materials ?? []), newMat] });
+                      input.value = "";
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const input = document.getElementById("mat-input") as HTMLInputElement;
+                    if (!input?.value.trim()) return;
+                    const newMat = { id: Date.now(), description: input.value.trim(), status: "Pendente" as const };
+                    setDraft({ ...draft, materials: [...(draft.materials ?? []), newMat] });
+                    input.value = "";
+                  }}
+                  className="px-3 py-2 bg-accent text-accent-foreground rounded-lg text-xs font-medium hover:bg-accent/80 transition-colors flex items-center gap-1"
+                >
+                  <Plus size={12} /> Add
+                </button>
               </div>
             </div>
           </div>
