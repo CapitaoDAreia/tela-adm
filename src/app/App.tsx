@@ -74,6 +74,10 @@ interface Milestone {
   deadline: string;
   completedAt: string;
   photos: string[];
+  contractorName?: string;
+  contractorPhone?: string;
+  contractorValue?: number;
+  contractorStatus?: "Não contratado" | "Contratado" | "Em execução" | "Concluído";
 }
 
 interface ProjectHistoryEntry {
@@ -937,6 +941,70 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
             </div>
           )}
 
+          {/* ── Seção: Empreiteiro ── */}
+          <div className="rounded-xl border border-border bg-muted/40 overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/60">
+              <HardHatIcon size={13} className="text-muted-foreground" />
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Empreiteiro</span>
+            </div>
+            <div className="px-4 py-3 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1.5">Nome</label>
+                  <input
+                    type="text"
+                    value={draft.contractorName ?? ""}
+                    onChange={e => setDraft({ ...draft, contractorName: e.target.value })}
+                    placeholder="Ex: João Silva"
+                    className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1.5">Telefone</label>
+                  <input
+                    type="tel"
+                    value={draft.contractorPhone ?? ""}
+                    onChange={e => setDraft({ ...draft, contractorPhone: e.target.value })}
+                    placeholder="(11) 99999-9999"
+                    className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1.5">Valor combinado</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={draft.contractorValue != null ? new Intl.NumberFormat("pt-BR").format(draft.contractorValue) : ""}
+                      onChange={e => {
+                        const raw = e.target.value.replace(/\D/g, "");
+                        setDraft({ ...draft, contractorValue: raw ? parseInt(raw, 10) : undefined });
+                      }}
+                      placeholder="0"
+                      className="w-full bg-input-background rounded-lg pl-8 pr-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1.5">Status</label>
+                  <select
+                    value={draft.contractorStatus ?? "Não contratado"}
+                    onChange={e => setDraft({ ...draft, contractorStatus: e.target.value as Milestone["contractorStatus"] })}
+                    className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground"
+                  >
+                    <option>Não contratado</option>
+                    <option>Contratado</option>
+                    <option>Em execução</option>
+                    <option>Concluído</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* ── Seção: Execução (trabalhador) ── */}
           <div className="rounded-xl border border-border bg-muted/40 overflow-hidden">
             <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/60">
@@ -1495,6 +1563,11 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                       {m.completedAt && (
                         <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-0.5">
                           <CalendarCheck size={9} /> {fmtDate(m.completedAt)}
+                        </span>
+                      )}
+                      {m.contractorName && (
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                          <HardHatIcon size={9} /> {m.contractorName}
                         </span>
                       )}
                     </div>
