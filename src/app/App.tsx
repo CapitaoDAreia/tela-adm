@@ -13,7 +13,25 @@ import {
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type Screen = "dashboard" | "detail" | "newQuote" | "quotes" | "quoteDetail";
+type Screen = "dashboard" | "detail" | "newQuote" | "quotes" | "quoteDetail" | "empreiteiros";
+
+interface Contractor {
+  id: number;
+  name: string;
+  phone: string;
+  specialty: string;
+  status: "Ativo" | "Inativo";
+  notes?: string;
+}
+
+const INITIAL_CONTRACTORS: Contractor[] = [
+  { id: 1, name: "Carlos Oliveira",  phone: "(11) 98432-1100", specialty: "Hidráulica",          status: "Ativo",   notes: "Trabalha com equipe de 2 ajudantes." },
+  { id: 2, name: "Marcos Ferreira",  phone: "(11) 97654-3322", specialty: "Elétrica",             status: "Ativo",   notes: "Certificado NR-10. Atende fins de semana." },
+  { id: 3, name: "Pedro Santos",     phone: "(11) 96543-2211", specialty: "Demolição e alvenaria", status: "Ativo"  },
+  { id: 4, name: "João Almeida",     phone: "(11) 95432-1100", specialty: "Revestimentos e piso", status: "Ativo"  },
+  { id: 5, name: "Ana Costa",        phone: "(11) 94321-0099", specialty: "Pintura e gesso",      status: "Ativo",   notes: "Especialista em texturas e efeitos especiais." },
+  { id: 6, name: "Roberto Lima",     phone: "(11) 93210-9988", specialty: "Marcenaria",           status: "Inativo", notes: "Fora do mercado temporariamente." },
+];
 
 interface QuoteItem {
   id: number;
@@ -3368,11 +3386,162 @@ function ReportModal({ project, onClose }: { project: Project; onClose: () => vo
 
 // ─── Bottom Navigation ────────────────────────────────────────────────────────
 
+function ContractorsScreen() {
+  const [contractors, setContractors] = useState<Contractor[]>(INITIAL_CONTRACTORS);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState<Omit<Contractor, "id">>({ name: "", phone: "", specialty: "", status: "Ativo", notes: "" });
+
+  const specialties = ["Demolição e alvenaria", "Hidráulica", "Elétrica", "Revestimentos e piso", "Forro e gesso", "Pintura", "Marcenaria", "Acabamentos", "Outra"];
+
+  const handleAdd = () => {
+    if (!form.name.trim() || !form.specialty) return;
+    setContractors(prev => [...prev, { ...form, id: Date.now() }]);
+    setForm({ name: "", phone: "", specialty: "", status: "Ativo", notes: "" });
+    setShowForm(false);
+  };
+
+  const toggleStatus = (id: number) =>
+    setContractors(prev => prev.map(c => c.id === id ? { ...c, status: c.status === "Ativo" ? "Inativo" : "Ativo" } : c));
+
+  const remove = (id: number) => setContractors(prev => prev.filter(c => c.id !== id));
+
+  const active = contractors.filter(c => c.status === "Ativo");
+  const inactive = contractors.filter(c => c.status === "Inativo");
+
+  return (
+    <div className="min-h-screen bg-background pb-20">
+      {/* Header */}
+      <div className="bg-card border-b border-border px-4 pt-10 pb-4">
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-0.5">Cadastro</p>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold text-foreground" style={{ fontFamily: "'DM Serif Display', serif" }}>Empreiteiros</h1>
+          <button
+            onClick={() => setShowForm(v => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-accent-foreground rounded-lg text-xs font-medium hover:bg-accent/80 transition-colors"
+          >
+            <Plus size={13} /> {showForm ? "Cancelar" : "Novo"}
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">{active.length} ativos · {inactive.length} inativos</p>
+      </div>
+
+      <div className="px-4 py-4 space-y-4">
+        {/* Formulário de novo empreiteiro */}
+        {showForm && (
+          <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 space-y-3">
+            <p className="text-xs font-semibold text-foreground">Novo empreiteiro</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="text-xs text-muted-foreground block mb-1">Nome *</label>
+                <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})}
+                  placeholder="Nome completo"
+                  className="w-full bg-input-background rounded-lg px-3 py-2 text-sm border border-border outline-none focus:ring-2 ring-accent/40 text-foreground placeholder:text-muted-foreground/50" />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Telefone</label>
+                <input type="tel" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}
+                  placeholder="(11) 99999-9999"
+                  className="w-full bg-input-background rounded-lg px-3 py-2 text-sm border border-border outline-none focus:ring-2 ring-accent/40 text-foreground placeholder:text-muted-foreground/50" />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Especialidade *</label>
+                <select value={form.specialty} onChange={e => setForm({...form, specialty: e.target.value})}
+                  className="w-full bg-input-background rounded-lg px-3 py-2 text-sm border border-border outline-none focus:ring-2 ring-accent/40 text-foreground">
+                  <option value="">Selecione</option>
+                  {specialties.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs text-muted-foreground block mb-1">Observações</label>
+                <textarea rows={2} value={form.notes} onChange={e => setForm({...form, notes: e.target.value})}
+                  placeholder="Informações relevantes..."
+                  className="w-full bg-input-background rounded-lg px-3 py-2 text-sm border border-border outline-none focus:ring-2 ring-accent/40 text-foreground resize-none placeholder:text-muted-foreground/50" />
+              </div>
+            </div>
+            <button onClick={handleAdd} disabled={!form.name.trim() || !form.specialty}
+              className="w-full py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              Cadastrar empreiteiro
+            </button>
+          </div>
+        )}
+
+        {/* Lista ativa */}
+        {active.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Ativos</p>
+            {active.map(c => (
+              <div key={c.id} className="bg-card rounded-xl border border-border p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground">{c.name}</p>
+                    <p className="text-xs text-accent mt-0.5">{c.specialty}</p>
+                    {c.phone && (
+                      <a href={`tel:${c.phone}`} className="flex items-center gap-1 text-xs text-muted-foreground mt-1 hover:text-foreground transition-colors">
+                        <Phone size={10} /> {c.phone}
+                      </a>
+                    )}
+                    {c.notes && <p className="text-xs text-muted-foreground mt-1 italic">{c.notes}</p>}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => toggleStatus(c.id)}
+                      className="text-[10px] px-2 py-1 rounded border border-emerald-800/40 bg-emerald-900/20 text-emerald-400 hover:bg-emerald-900/40 transition-colors">
+                      Ativo
+                    </button>
+                    <button onClick={() => remove(c.id)} className="p-1.5 text-muted-foreground hover:text-red-400 transition-colors">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Lista inativa */}
+        {inactive.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Inativos</p>
+            {inactive.map(c => (
+              <div key={c.id} className="bg-card rounded-xl border border-border p-4 opacity-60">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground">{c.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{c.specialty}</p>
+                    {c.phone && <p className="text-xs text-muted-foreground mt-1"><Phone size={10} className="inline mr-1" />{c.phone}</p>}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => toggleStatus(c.id)}
+                      className="text-[10px] px-2 py-1 rounded border border-border bg-muted text-muted-foreground hover:border-emerald-800/40 hover:bg-emerald-900/20 hover:text-emerald-400 transition-colors">
+                      Inativo
+                    </button>
+                    <button onClick={() => remove(c.id)} className="p-1.5 text-muted-foreground hover:text-red-400 transition-colors">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {contractors.length === 0 && (
+          <div className="text-center py-16">
+            <HardHatIcon size={32} className="mx-auto text-muted-foreground/30 mb-3" />
+            <p className="text-sm text-muted-foreground">Nenhum empreiteiro cadastrado</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">Clique em "Novo" para adicionar</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function BottomNav({ active, onChange }: { active: Screen; onChange: (s: Screen) => void }) {
   const items: { id: Screen; label: string; icon: React.ReactNode }[] = [
-    { id: "dashboard", label: "Obras", icon: <Home size={20} /> },
-    { id: "quotes", label: "Orçamentos", icon: <ClipboardList size={20} /> },
-    { id: "newQuote", label: "Novo Orçamento", icon: <FilePlus size={20} /> },
+    { id: "dashboard",    label: "Obras",         icon: <Home size={20} /> },
+    { id: "quotes",       label: "Orçamentos",    icon: <ClipboardList size={20} /> },
+    { id: "empreiteiros", label: "Empreiteiros",  icon: <HardHatIcon size={20} /> },
+    { id: "newQuote",     label: "Novo Orçamento", icon: <FilePlus size={20} /> },
   ];
 
   return (
@@ -3456,7 +3625,7 @@ export default function App() {
     setQuotes(prev => [q, ...prev]);
   };
 
-  const showNav = screen === "dashboard" || screen === "quotes" || screen === "newQuote";
+  const showNav = screen === "dashboard" || screen === "quotes" || screen === "newQuote" || screen === "empreiteiros";
 
   return (
     <div className="w-full min-h-screen bg-background" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -3494,6 +3663,7 @@ export default function App() {
           onGenerateProject={handleGenerateProject}
         />
       )}
+      {screen === "empreiteiros" && <ContractorsScreen />}
       {showNav && (
         <BottomNav active={screen} onChange={setScreen} />
       )}
