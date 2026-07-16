@@ -88,7 +88,8 @@ interface Milestone {
   date: string;
   status: StepStatus;
   description: string;
-  startDate?: string;
+  startDate?: string;   // início previsto (planejamento)
+  startedAt?: string;   // início real (preenchido ao virar "Em andamento")
   deadline: string;
   completedAt: string;
   photos: string[];
@@ -154,11 +155,11 @@ const PROJECTS: Project[] = [
       { id: 7, date: "08 Jul 2025", description: "Fornecedor Pedreira Boa Vista", category: "Material", amount: 3800, isPayment: true, paymentStatus: "A fazer", dueDate: "2025-07-20" },
     ],
     milestones: [
-      { label: "Demolição e limpeza", done: true, date: "Mar 2025", status: "Concluído", description: "Remoção do revestimento existente, demolição de paredes não estruturais e limpeza completa do apartamento.", deadline: "20/03/2025", completedAt: "18/03/2025", photos: ["https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=400&h=300&fit=crop"] },
-      { label: "Instalações hidráulicas", done: true, date: "Abr 2025", status: "Concluído", description: "Substituição de toda a tubulação de água fria, quente e esgoto do banheiro e cozinha compacta.", deadline: "30/04/2025", completedAt: "28/04/2025", photos: [] },
-      { label: "Instalações elétricas", done: true, date: "Mai 2025", status: "Concluído", description: "Passagem de fiação nova, instalação de quadro de distribuição e pontos de tomada conforme projeto.", deadline: "30/05/2025", completedAt: "27/05/2025", photos: [] },
-      { label: "Revestimentos e piso", done: false, date: "Jul 2025", status: "Em andamento", description: "Assentamento de porcelanato 60×60 na área social e banheiro, incluindo rejunte e rodapés.", deadline: "25/07/2025", completedAt: "", photos: [] },
-      { label: "Pintura e acabamentos", done: false, date: "Ago 2025", status: "Pendente", description: "Aplicação de massa corrida, tinta látex premium em todas as paredes e teto, instalação de luminárias.", deadline: "29/08/2025", completedAt: "", photos: [] },
+      { label: "Demolição e limpeza", done: true, date: "Mar 2025", status: "Concluído", description: "Remoção do revestimento existente, demolição de paredes não estruturais e limpeza completa do apartamento.", startDate: "10/03/2025", startedAt: "11/03/2025", deadline: "20/03/2025", completedAt: "18/03/2025", photos: ["https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=400&h=300&fit=crop"] },
+      { label: "Instalações hidráulicas", done: true, date: "Abr 2025", status: "Concluído", description: "Substituição de toda a tubulação de água fria, quente e esgoto do banheiro e cozinha compacta.", startDate: "24/03/2025", startedAt: "25/03/2025", deadline: "30/04/2025", completedAt: "28/04/2025", photos: [] },
+      { label: "Instalações elétricas", done: true, date: "Mai 2025", status: "Concluído", description: "Passagem de fiação nova, instalação de quadro de distribuição e pontos de tomada conforme projeto.", startDate: "05/05/2025", startedAt: "06/05/2025", deadline: "30/05/2025", completedAt: "27/05/2025", photos: [] },
+      { label: "Revestimentos e piso", done: false, date: "Jul 2025", status: "Em andamento", description: "Assentamento de porcelanato 60×60 na área social e banheiro, incluindo rejunte e rodapés.", startDate: "02/06/2025", startedAt: "10/07/2025", deadline: "25/07/2025", completedAt: "", photos: [] },
+      { label: "Pintura e acabamentos", done: false, date: "Ago 2025", status: "Pendente", description: "Aplicação de massa corrida, tinta látex premium em todas as paredes e teto, instalação de luminárias.", startDate: "28/07/2025", deadline: "29/08/2025", completedAt: "", photos: [] },
     ],
     photos: [
       { url: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600&h=400&fit=crop&auto=format", caption: "Cozinha compacta – pré-acabamento", date: "30 Jun 2025" },
@@ -188,11 +189,11 @@ const PROJECTS: Project[] = [
       { id: 4, date: "08 Jul 2025", description: "Parcela 2/4 – equipe Ferreira", category: "Serviço", amount: 4500, isPayment: true, paymentStatus: "A fazer", dueDate: "2025-07-18" },
     ],
     milestones: [
-      { label: "Demolição e adequação", done: true, date: "Mai 2025", status: "Concluído", description: "Demolição de revestimentos e adaptação do layout conforme projeto aprovado.", deadline: "10/05/2025", completedAt: "09/05/2025", photos: ["https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=400&h=300&fit=crop"] },
-      { label: "Alvenaria e divisórias", done: false, date: "Jul 2025", status: "Em andamento", description: "Construção das novas divisórias em alvenaria para separação de ambientes conforme planta.", deadline: "20/07/2025", completedAt: "", photos: [] },
-      { label: "Instalações elétricas e hidráulicas", done: false, date: "Ago 2025", status: "Pendente", description: "Passagem de tubulações e fiação elétrica completa.", deadline: "31/08/2025", completedAt: "", photos: [] },
-      { label: "Revestimentos e piso", done: false, date: "Set 2025", status: "Pendente", description: "", deadline: "30/09/2025", completedAt: "", photos: [] },
-      { label: "Pintura e entrega", done: false, date: "Out 2025", status: "Pendente", description: "", deadline: "31/10/2025", completedAt: "", photos: [] },
+      { label: "Demolição e adequação", done: true, date: "Mai 2025", status: "Concluído", description: "Demolição de revestimentos e adaptação do layout conforme projeto aprovado.", startDate: "05/05/2025", startedAt: "05/05/2025", deadline: "10/05/2025", completedAt: "09/05/2025", photos: ["https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=400&h=300&fit=crop"] },
+      { label: "Alvenaria e divisórias", done: false, date: "Jul 2025", status: "Em andamento", description: "Construção das novas divisórias em alvenaria para separação de ambientes conforme planta.", startDate: "12/05/2025", startedAt: "15/05/2025", deadline: "20/07/2025", completedAt: "", photos: [] },
+      { label: "Instalações elétricas e hidráulicas", done: false, date: "Ago 2025", status: "Pendente", description: "Passagem de tubulações e fiação elétrica completa.", startDate: "21/07/2025", deadline: "31/08/2025", completedAt: "", photos: [] },
+      { label: "Revestimentos e piso", done: false, date: "Set 2025", status: "Pendente", description: "", startDate: "01/09/2025", deadline: "30/09/2025", completedAt: "", photos: [] },
+      { label: "Pintura e entrega", done: false, date: "Out 2025", status: "Pendente", description: "", startDate: "01/10/2025", deadline: "31/10/2025", completedAt: "", photos: [] },
     ],
     photos: [
       { url: "https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=600&h=400&fit=crop&auto=format", caption: "Demolição concluída", date: "28 Jun 2025" },
@@ -218,11 +219,11 @@ const PROJECTS: Project[] = [
       { id: 2, date: "10 Mar 2025", description: "Mão de obra final e limpeza", category: "Serviço", amount: 1400 },
     ],
     milestones: [
-      { label: "Demolição e limpeza", done: true, date: "Nov 2024", status: "Concluído", description: "Demolição completa do revestimento original.", deadline: "15/11/2024", completedAt: "14/11/2024", photos: [] },
-      { label: "Instalações elétricas e hidráulicas", done: true, date: "Dez 2024", status: "Concluído", description: "Toda a infraestrutura de instalações substituída.", deadline: "20/12/2024", completedAt: "19/12/2024", photos: [] },
-      { label: "Revestimentos e piso", done: true, date: "Jan 2025", status: "Concluído", description: "Porcelanato assentado em todo o apartamento.", deadline: "31/01/2025", completedAt: "28/01/2025", photos: [] },
-      { label: "Pintura e acabamentos", done: true, date: "Fev 2025", status: "Concluído", description: "Pintura e instalações finais concluídas.", deadline: "28/02/2025", completedAt: "25/02/2025", photos: [] },
-      { label: "Móveis e entrega", done: true, date: "Mar 2025", status: "Concluído", description: "Instalação de móveis planejados e entrega ao cliente.", deadline: "20/03/2025", completedAt: "18/03/2025", photos: ["https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=400&h=300&fit=crop"] },
+      { label: "Demolição e limpeza", done: true, date: "Nov 2024", status: "Concluído", description: "Demolição completa do revestimento original.", startDate: "04/11/2024", startedAt: "04/11/2024", deadline: "15/11/2024", completedAt: "14/11/2024", photos: [] },
+      { label: "Instalações elétricas e hidráulicas", done: true, date: "Dez 2024", status: "Concluído", description: "Toda a infraestrutura de instalações substituída.", startDate: "18/11/2024", startedAt: "18/11/2024", deadline: "20/12/2024", completedAt: "19/12/2024", photos: [] },
+      { label: "Revestimentos e piso", done: true, date: "Jan 2025", status: "Concluído", description: "Porcelanato assentado em todo o apartamento.", startDate: "02/01/2025", startedAt: "03/01/2025", deadline: "31/01/2025", completedAt: "28/01/2025", photos: [] },
+      { label: "Pintura e acabamentos", done: true, date: "Fev 2025", status: "Concluído", description: "Pintura e instalações finais concluídas.", startDate: "03/02/2025", startedAt: "04/02/2025", deadline: "28/02/2025", completedAt: "25/02/2025", photos: [] },
+      { label: "Móveis e entrega", done: true, date: "Mar 2025", status: "Concluído", description: "Instalação de móveis planejados e entrega ao cliente.", startDate: "03/03/2025", startedAt: "04/03/2025", deadline: "20/03/2025", completedAt: "18/03/2025", photos: ["https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=400&h=300&fit=crop"] },
     ],
     photos: [
       { url: "https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=600&h=400&fit=crop&auto=format", caption: "Área integrada – entregue", date: "18 Mar 2025" },
@@ -246,9 +247,9 @@ const PROJECTS: Project[] = [
     image: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&h=500&fit=crop&auto=format",
     expenses: [],
     milestones: [
-      { label: "Visita técnica", done: true, date: "Jun 2025", status: "Concluído", description: "Visita ao apartamento para levantamento e medições.", deadline: "20/06/2025", completedAt: "18/06/2025", photos: [] },
-      { label: "Aprovação do orçamento", done: false, date: "Jul 2025", status: "Pendente", description: "Aguardando assinatura do contrato e aprovação formal.", deadline: "18/07/2025", completedAt: "", photos: [] },
-      { label: "Início da obra", done: false, date: "Ago 2025", status: "Pendente", description: "", deadline: "04/08/2025", completedAt: "", photos: [] },
+      { label: "Visita técnica", done: true, date: "Jun 2025", status: "Concluído", description: "Visita ao apartamento para levantamento e medições.", startDate: "15/06/2025", startedAt: "16/06/2025", deadline: "20/06/2025", completedAt: "18/06/2025", photos: [] },
+      { label: "Aprovação do orçamento", done: false, date: "Jul 2025", status: "Pendente", description: "Aguardando assinatura do contrato e aprovação formal.", startDate: "08/07/2025", deadline: "18/07/2025", completedAt: "", photos: [] },
+      { label: "Início da obra", done: false, date: "Ago 2025", status: "Pendente", description: "", startDate: "04/08/2025", deadline: "04/08/2025", completedAt: "", photos: [] },
     ],
     photos: [],
   },
@@ -864,6 +865,8 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
       status: pendingStatus,
       done: pendingStatus === "Concluído",
       completedAt: pendingStatus === "Concluído" ? today : "",
+      // início real: registra na primeira vez que vira "Em andamento" e preserva depois
+      startedAt: pendingStatus === "Em andamento" ? (prev.startedAt || today) : prev.startedAt,
     }));
     setPendingStatus(null);
   };
@@ -937,22 +940,20 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
 
           {/* Datas — início e prazo, lado a lado */}
           <div className={isNew ? "grid grid-cols-2 gap-3" : "space-y-2"}>
-            {isNew && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground block flex items-center gap-1.5">
-                  <CalendarDays size={11} className="text-accent" /> Data de início <span className="text-accent">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={draft.startDate ?? ""}
-                  onChange={e => setDraft({ ...draft, startDate: e.target.value })}
-                  className="w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
-                />
-                <p className="text-[10px] text-muted-foreground/70 leading-tight">
-                  Previsão — usada no cronograma e pode ser ajustada depois.
-                </p>
-              </div>
-            )}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground block flex items-center gap-1.5">
+                <CalendarDays size={11} className="text-accent" /> Início previsto <span className="text-accent">*</span>
+              </label>
+              <input
+                type="date"
+                value={draft.startDate ? (draft.startDate.includes("/") ? draft.startDate.split("/").reverse().join("-") : draft.startDate) : ""}
+                onChange={e => setDraft({ ...draft, startDate: e.target.value })}
+                className="w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+              />
+              <p className="text-[10px] text-muted-foreground/70 leading-tight">
+                Previsão — usada no cronograma e pode ser ajustada depois.
+              </p>
+            </div>
 
           {/* Prazo — definido no planejamento, fora das seções */}
           <div className="space-y-2">
@@ -1006,6 +1007,16 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
             )}
           </div>
           </div>{/* fim grid datas */}
+
+          {/* Início real — chip read-only, preenchido ao virar "Em andamento" */}
+          {draft.startedAt && (
+            <div className="flex items-center gap-2 px-3 py-2.5 bg-blue-900/20 border border-blue-800/40 rounded-lg">
+              <CalendarDays size={13} className="text-blue-400 shrink-0" />
+              <span className="text-xs text-blue-400 font-mono">
+                Início real: {fmtDate(draft.startedAt)}
+              </span>
+            </div>
+          )}
 
           {/* Conclusão real — chip read-only, preenchido automaticamente ao marcar Concluído */}
           {draft.status === "Concluído" && draft.completedAt && (
@@ -1106,10 +1117,10 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
                 <PackagePlus size={13} className="text-muted-foreground" />
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Materiais</span>
               </div>
-              {draft.startDate && (
+              {draft.startDate && parseAnyDate(draft.startDate) && (
                 <span className="text-[10px] text-amber-500 font-medium">
                   Pedir até {(() => {
-                    const d = new Date(draft.startDate + "T12:00:00");
+                    const d = parseAnyDate(draft.startDate!)!;
                     d.setDate(d.getDate() - 2);
                     return d.toLocaleDateString("pt-BR");
                   })()}
@@ -1347,7 +1358,7 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
           </button>
           <button
             type="button"
-            disabled={!draft.label.trim() || (isNew && !draft.startDate)}
+            disabled={!draft.label.trim() || !draft.startDate}
             onClick={() => { onSave(draft); onClose(); }}
             className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/80 transition-colors disabled:opacity-40 disabled:pointer-events-none"
           >
@@ -1831,6 +1842,19 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
             });
             cur.setMonth(cur.getMonth() + 1);
           }
+          const semData = milestones.filter(m => !parseD(m.startDate ?? "")).length;
+          const comData = milestones.length - semData;
+          if (comData === 0) {
+            return (
+              <div className="p-8 text-center">
+                <CalendarDays size={32} className="mx-auto text-muted-foreground/30 mb-3" />
+                <p className="text-sm text-muted-foreground">Nenhuma etapa com data de início definida.</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">
+                  Defina a data de início das etapas para visualizar o cronograma.
+                </p>
+              </div>
+            );
+          }
           return (
             <div className="p-4 space-y-4">
               <div className="flex items-center justify-between">
@@ -1858,12 +1882,12 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
               {/* Barras das etapas */}
               <div className="space-y-2.5">
                 {milestones.map((m, i) => {
-                  const prevEnd = i === 0 ? projStart : (parseD(milestones[i - 1].deadline) ?? projStart);
-                  const start = parseD(m.startDate ?? "") ?? prevEnd;
+                  const start = parseD(m.startDate ?? "");
                   const end   = parseD(m.deadline) ?? start;
-                  if (!start || !end) return null;
+                  if (!start || !end) return null;   // sem data de início: não inferimos, não renderizamos
                   const left  = pct(start);
                   const width = Math.max(1.5, pct(end) - left);
+                  const realStart = parseD(m.startedAt ?? "");
                   const cfg = STEP_STATUS_CONFIG[m.status];
                   return (
                     <div key={i} className="flex items-center gap-3">
@@ -1877,12 +1901,20 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                         ))}
                         {/* trilho */}
                         <div className="absolute inset-y-0 left-0 right-0 rounded-full bg-muted/40" />
-                        {/* barra */}
+                        {/* barra (início previsto → prazo) */}
                         <div
                           className={`absolute inset-y-1 rounded-full ${STATUS_COLORS[m.status]} transition-all`}
                           style={{ left: `${left}%`, width: `${width}%` }}
-                          title={`${fmtDate(m.startDate ?? m.deadline)} → ${fmtDate(m.deadline)}`}
+                          title={`Previsto: ${fmtDate(m.startDate ?? "")} → ${fmtDate(m.deadline)}`}
                         />
+                        {/* marcador de início real */}
+                        {realStart && (
+                          <div
+                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-2 rotate-45 bg-blue-500 border border-white/70 z-20"
+                            style={{ left: `${pct(realStart)}%` }}
+                            title={`Início real: ${fmtDate(m.startedAt ?? "")}`}
+                          />
+                        )}
                         {/* linha hoje */}
                         {todayPct >= 0 && todayPct <= 100 && (
                           <div className="absolute inset-y-0 w-0.5 bg-red-500 z-10" style={{ left: `${todayPct}%` }} />
@@ -1896,6 +1928,14 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                 })}
               </div>
 
+              {/* Aviso de etapas sem data de início */}
+              {semData > 0 && (
+                <p className="text-[10px] text-amber-500/90 flex items-center gap-1.5">
+                  <AlertTriangle size={11} />
+                  {semData} etapa{semData > 1 ? "s" : ""} sem data de início não aparece{semData > 1 ? "m" : ""} no cronograma.
+                </p>
+              )}
+
               {/* Legenda */}
               <div className="flex flex-wrap gap-3 pt-2 border-t border-border">
                 {(["Concluído","Em andamento","Pendente","Cancelado"] as StepStatus[]).map(s => (
@@ -1904,6 +1944,10 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                     <span className="text-[10px] text-muted-foreground">{s}</span>
                   </div>
                 ))}
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rotate-45 bg-blue-500 border border-white/70" />
+                  <span className="text-[10px] text-muted-foreground">Início real</span>
+                </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-px h-3 bg-red-500/70" />
                   <span className="text-[10px] text-muted-foreground">Hoje</span>
