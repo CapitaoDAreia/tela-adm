@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
@@ -10,351 +10,16 @@ import {
   ListChecks, ChevronRight, Trash2, PackagePlus, ClipboardList, FilePlus,
   Printer, ShieldCheck, HardHatIcon, FileBarChart2, Pencil, RotateCcw, CheckCheck, Ban, AlertTriangle
 } from "lucide-react";
+import type {
+  Screen, Project, ProjectStatus, Milestone, StepStatus, Expense, ProjectPhoto,
+  QuoteRecord, QuoteItem, QuoteStatus, Contractor,
+} from "../lib/types";
+import { projectsApi, quotesApi, contractorsApi } from "../lib/api";
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+// ─── Types (re-exports for components that haven't been extracted yet) ────────
+// DetailTab and DashFilter remain here as they are UI-only types
+type DetailTab = "visao" | "etapas" | "despesas" | "galeria" | "cronograma";
 
-type Screen = "dashboard" | "detail" | "newQuote" | "quotes" | "quoteDetail" | "empreiteiros";
-
-interface Contractor {
-  id: number;
-  name: string;
-  phone: string;
-  specialty: string;
-  status: "Ativo" | "Inativo";
-  notes?: string;
-}
-
-const INITIAL_CONTRACTORS: Contractor[] = [
-  { id: 1, name: "Carlos Oliveira",  phone: "(11) 98432-1100", specialty: "Hidráulica",          status: "Ativo",   notes: "Trabalha com equipe de 2 ajudantes." },
-  { id: 2, name: "Marcos Ferreira",  phone: "(11) 97654-3322", specialty: "Elétrica",             status: "Ativo",   notes: "Certificado NR-10. Atende fins de semana." },
-  { id: 3, name: "Pedro Santos",     phone: "(11) 96543-2211", specialty: "Demolição e alvenaria", status: "Ativo"  },
-  { id: 4, name: "João Almeida",     phone: "(11) 95432-1100", specialty: "Revestimentos e piso", status: "Ativo"  },
-  { id: 5, name: "Ana Costa",        phone: "(11) 94321-0099", specialty: "Pintura e gesso",      status: "Ativo",   notes: "Especialista em texturas e efeitos especiais." },
-  { id: 6, name: "Roberto Lima",     phone: "(11) 93210-9988", specialty: "Marcenaria",           status: "Inativo", notes: "Fora do mercado temporariamente." },
-];
-
-interface QuoteItem {
-  id: number;
-  title: string;
-  description: string;
-  amount: string;
-}
-
-type QuoteStatus = "Solicitado" | "Em análise" | "Aprovado" | "Cancelado";
-
-interface QuoteHistoryEntry {
-  datetime: string;
-  description: string;
-}
-
-interface QuoteRecord {
-  id: number;
-  clientName: string;
-  phone: string;
-  description: string;
-  items: QuoteItem[];
-  budgeted: number;
-  contractValue: number;
-  urgency: string;
-  quoteDeadline?: string;
-  startDate: string;
-  endDate: string;
-  status: QuoteStatus;
-  cancellationReason?: string;
-  analysisStartedAt?: string;
-  history: QuoteHistoryEntry[];
-  createdAt: string;
-}
-
-type ProjectStatus = "Em andamento" | "Concluído" | "Pausado" | "Cancelada" | "Orçamento";
-
-interface Expense {
-  id: number;
-  date: string;
-  description: string;
-  category: string;
-  amount: number;
-  notes?: string;
-  isPayment?: boolean;
-  paymentStatus?: "Realizado" | "A fazer";
-  dueDate?: string;
-}
-
-type StepStatus = "Concluído" | "Em andamento" | "Pendente" | "Cancelado";
-
-interface Milestone {
-  label: string;
-  done: boolean;
-  date: string;
-  status: StepStatus;
-  description: string;
-  startDate?: string;   // início previsto (planejamento)
-  startedAt?: string;   // início real (preenchido ao virar "Em andamento")
-  deadline: string;
-  completedAt: string;
-  photos: string[];
-  contractorName?: string;
-  contractorPhone?: string;
-  contractorValue?: number;
-  contractorStatus?: "Não contratado" | "Contratado" | "Em execução" | "Concluído";
-  materials?: { id: number; description: string; status: "Pendente" | "Pedido" | "Recebido" }[];
-}
-
-interface ProjectHistoryEntry {
-  datetime: string;
-  description: string;
-}
-
-interface Project {
-  id: number;
-  name: string;
-  client: string;
-  status: ProjectStatus;
-  progress: number;
-  contractValue: number;
-  budgeted: number;
-  spent: number;
-  phase: string;
-  location: string;
-  startDate: string;
-  endDate: string;
-  quoteDeadline: string;
-  image: string;
-  expenses: Expense[];
-  milestones: Milestone[];
-  photos: { url: string; caption: string; date: string }[];
-  history?: ProjectHistoryEntry[];
-  cancelReason?: string;
-}
-
-// ─── Mock Data ───────────────────────────────────────────────────────────────
-
-const PROJECTS: Project[] = [
-  {
-    id: 1,
-    name: "Studio Monteiro",
-    client: "Rafael Monteiro",
-    status: "Em andamento",
-    progress: 62,
-    contractValue: 104400,
-    budgeted: 87000,
-    spent: 53940,
-    phase: "Acabamento – piso e pintura",
-    location: "Ap. 74 · Ed. Araucária, Pinheiros – SP",
-    startDate: "10/03/2025",
-    endDate: "29/08/2025",
-    quoteDeadline: "28/02/2025",
-    image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&h=500&fit=crop&auto=format",
-    expenses: [
-      { id: 1, date: "02 Jul 2025", description: "Porcelanato 60×60 – área social", category: "Material", amount: 4800 },
-      { id: 2, date: "28 Jun 2025", description: "Mão de obra – pintura interna", category: "Serviço", amount: 2900 },
-      { id: 3, date: "21 Jun 2025", description: "Instalação elétrica – pontos extras", category: "Serviço", amount: 1950 },
-      { id: 4, date: "15 Jun 2025", description: "Bancada de quartzo – cozinha compacta", category: "Material", amount: 3400 },
-      { id: 5, date: "07 Jun 2025", description: "Louças e metais – banheiro", category: "Material", amount: 2750 },
-      { id: 6, date: "08 Jul 2025", description: "Parcela 4/6 – equipe Monteiro", category: "Serviço", amount: 6200, isPayment: true, paymentStatus: "A fazer", dueDate: "2025-07-15" },
-      { id: 7, date: "08 Jul 2025", description: "Fornecedor Pedreira Boa Vista", category: "Material", amount: 3800, isPayment: true, paymentStatus: "A fazer", dueDate: "2025-07-20" },
-    ],
-    milestones: [
-      { label: "Demolição e limpeza", done: true, date: "Mar 2025", status: "Concluído", description: "Remoção do revestimento existente, demolição de paredes não estruturais e limpeza completa do apartamento.", startDate: "10/03/2025", startedAt: "11/03/2025", deadline: "20/03/2025", completedAt: "18/03/2025", photos: ["https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=400&h=300&fit=crop"] },
-      { label: "Instalações hidráulicas", done: true, date: "Abr 2025", status: "Concluído", description: "Substituição de toda a tubulação de água fria, quente e esgoto do banheiro e cozinha compacta.", startDate: "24/03/2025", startedAt: "25/03/2025", deadline: "30/04/2025", completedAt: "28/04/2025", photos: [] },
-      { label: "Instalações elétricas", done: true, date: "Mai 2025", status: "Concluído", description: "Passagem de fiação nova, instalação de quadro de distribuição e pontos de tomada conforme projeto.", startDate: "05/05/2025", startedAt: "06/05/2025", deadline: "30/05/2025", completedAt: "27/05/2025", photos: [] },
-      { label: "Revestimentos e piso", done: false, date: "Jul 2025", status: "Em andamento", description: "Assentamento de porcelanato 60×60 na área social e banheiro, incluindo rejunte e rodapés.", startDate: "02/06/2025", startedAt: "10/07/2025", deadline: "25/07/2025", completedAt: "", photos: [] },
-      { label: "Pintura e acabamentos", done: false, date: "Ago 2025", status: "Pendente", description: "Aplicação de massa corrida, tinta látex premium em todas as paredes e teto, instalação de luminárias.", startDate: "28/07/2025", deadline: "29/08/2025", completedAt: "", photos: [] },
-    ],
-    photos: [
-      { url: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600&h=400&fit=crop&auto=format", caption: "Cozinha compacta – pré-acabamento", date: "30 Jun 2025" },
-      { url: "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=600&h=400&fit=crop&auto=format", caption: "Área integrada – reboco pronto", date: "22 Jun 2025" },
-      { url: "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?w=600&h=400&fit=crop&auto=format", caption: "Banheiro – azulejo assentado", date: "14 Jun 2025" },
-    ],
-  },
-  {
-    id: 2,
-    name: "Studio Ferreira",
-    client: "Camila Ferreira",
-    status: "Em andamento",
-    progress: 38,
-    contractValue: 88800,
-    budgeted: 74000,
-    spent: 28120,
-    phase: "Alvenaria e instalações",
-    location: "Ap. 32 · Ed. Vila Nova, Vila Madalena – SP",
-    startDate: "05/05/2025",
-    endDate: "31/10/2025",
-    quoteDeadline: "25/04/2025",
-    image: "https://images.unsplash.com/photo-1554995207-c18c203602cb?w=800&h=500&fit=crop&auto=format",
-    expenses: [
-      { id: 1, date: "03 Jul 2025", description: "Tijolo de vedação – paredes divisórias", category: "Material", amount: 1800 },
-      { id: 2, date: "01 Jul 2025", description: "Mão de obra – alvenaria", category: "Serviço", amount: 3200 },
-      { id: 3, date: "25 Jun 2025", description: "Tubulação hidráulica – banheiro e cozinha", category: "Material", amount: 1450 },
-      { id: 4, date: "08 Jul 2025", description: "Parcela 2/4 – equipe Ferreira", category: "Serviço", amount: 4500, isPayment: true, paymentStatus: "A fazer", dueDate: "2025-07-18" },
-    ],
-    milestones: [
-      { label: "Demolição e adequação", done: true, date: "Mai 2025", status: "Concluído", description: "Demolição de revestimentos e adaptação do layout conforme projeto aprovado.", startDate: "05/05/2025", startedAt: "05/05/2025", deadline: "10/05/2025", completedAt: "09/05/2025", photos: ["https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=400&h=300&fit=crop"] },
-      { label: "Alvenaria e divisórias", done: false, date: "Jul 2025", status: "Em andamento", description: "Construção das novas divisórias em alvenaria para separação de ambientes conforme planta.", startDate: "12/05/2025", startedAt: "15/05/2025", deadline: "20/07/2025", completedAt: "", photos: [] },
-      { label: "Instalações elétricas e hidráulicas", done: false, date: "Ago 2025", status: "Pendente", description: "Passagem de tubulações e fiação elétrica completa.", startDate: "21/07/2025", deadline: "31/08/2025", completedAt: "", photos: [] },
-      { label: "Revestimentos e piso", done: false, date: "Set 2025", status: "Pendente", description: "", startDate: "01/09/2025", deadline: "30/09/2025", completedAt: "", photos: [] },
-      { label: "Pintura e entrega", done: false, date: "Out 2025", status: "Pendente", description: "", startDate: "01/10/2025", deadline: "31/10/2025", completedAt: "", photos: [] },
-    ],
-    photos: [
-      { url: "https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=600&h=400&fit=crop&auto=format", caption: "Demolição concluída", date: "28 Jun 2025" },
-    ],
-  },
-  {
-    id: 3,
-    name: "Studio Nakamura",
-    client: "Yuki Nakamura",
-    status: "Concluído",
-    progress: 100,
-    contractValue: 81600,
-    budgeted: 68000,
-    spent: 65500,
-    phase: "Entregue",
-    location: "Ap. 112 · Ed. Ouro Preto, Consolação – SP",
-    startDate: "04/11/2024",
-    endDate: "18/03/2025",
-    quoteDeadline: "22/10/2024",
-    image: "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&h=500&fit=crop&auto=format",
-    expenses: [
-      { id: 1, date: "18 Mar 2025", description: "Móvel planejado – parede multifuncional", category: "Material", amount: 9800 },
-      { id: 2, date: "10 Mar 2025", description: "Mão de obra final e limpeza", category: "Serviço", amount: 1400 },
-    ],
-    milestones: [
-      { label: "Demolição e limpeza", done: true, date: "Nov 2024", status: "Concluído", description: "Demolição completa do revestimento original.", startDate: "04/11/2024", startedAt: "04/11/2024", deadline: "15/11/2024", completedAt: "14/11/2024", photos: [] },
-      { label: "Instalações elétricas e hidráulicas", done: true, date: "Dez 2024", status: "Concluído", description: "Toda a infraestrutura de instalações substituída.", startDate: "18/11/2024", startedAt: "18/11/2024", deadline: "20/12/2024", completedAt: "19/12/2024", photos: [] },
-      { label: "Revestimentos e piso", done: true, date: "Jan 2025", status: "Concluído", description: "Porcelanato assentado em todo o apartamento.", startDate: "02/01/2025", startedAt: "03/01/2025", deadline: "31/01/2025", completedAt: "28/01/2025", photos: [] },
-      { label: "Pintura e acabamentos", done: true, date: "Fev 2025", status: "Concluído", description: "Pintura e instalações finais concluídas.", startDate: "03/02/2025", startedAt: "04/02/2025", deadline: "28/02/2025", completedAt: "25/02/2025", photos: [] },
-      { label: "Móveis e entrega", done: true, date: "Mar 2025", status: "Concluído", description: "Instalação de móveis planejados e entrega ao cliente.", startDate: "03/03/2025", startedAt: "04/03/2025", deadline: "20/03/2025", completedAt: "18/03/2025", photos: ["https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=400&h=300&fit=crop"] },
-    ],
-    photos: [
-      { url: "https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=600&h=400&fit=crop&auto=format", caption: "Área integrada – entregue", date: "18 Mar 2025" },
-      { url: "https://images.unsplash.com/photo-1631679706909-1844bbd07221?w=600&h=400&fit=crop&auto=format", caption: "Banheiro finalizado", date: "18 Mar 2025" },
-    ],
-  },
-  {
-    id: 4,
-    name: "Studio Carvalho",
-    client: "Bruno Carvalho",
-    status: "Orçamento",
-    progress: 0,
-    contractValue: 109200,
-    budgeted: 91000,
-    spent: 0,
-    phase: "Aguardando aprovação",
-    location: "Ap. 205 · Ed. Parque Sul, Moema – SP",
-    startDate: "–",
-    endDate: "–",
-    quoteDeadline: "18/07/2025",
-    image: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&h=500&fit=crop&auto=format",
-    expenses: [],
-    milestones: [
-      { label: "Visita técnica", done: true, date: "Jun 2025", status: "Concluído", description: "Visita ao apartamento para levantamento e medições.", startDate: "15/06/2025", startedAt: "16/06/2025", deadline: "20/06/2025", completedAt: "18/06/2025", photos: [] },
-      { label: "Aprovação do orçamento", done: false, date: "Jul 2025", status: "Pendente", description: "Aguardando assinatura do contrato e aprovação formal.", startDate: "08/07/2025", deadline: "18/07/2025", completedAt: "", photos: [] },
-      { label: "Início da obra", done: false, date: "Ago 2025", status: "Pendente", description: "", startDate: "04/08/2025", deadline: "04/08/2025", completedAt: "", photos: [] },
-    ],
-    photos: [],
-  },
-];
-
-const MOCK_QUOTES: QuoteRecord[] = [
-  {
-    id: 101,
-    clientName: "Isabela Ramos",
-    phone: "",
-    description: "Studio 48m², Consolação",
-    items: [
-      { id: 1, title: "Demolição e limpeza", description: "", amount: "8000" },
-      { id: 2, title: "Instalações hidráulicas", description: "", amount: "12000" },
-      { id: 3, title: "Revestimentos e piso", description: "", amount: "22000" },
-      { id: 4, title: "Pintura e acabamentos", description: "", amount: "14000" },
-      { id: 5, title: "Móveis planejados", description: "", amount: "6000" },
-    ],
-    budgeted: 62000,
-    contractValue: 74400,
-    urgency: "Normal",
-    quoteDeadline: "25/07/2025",
-    startDate: "",
-    endDate: "",
-    status: "Em análise",
-    analysisStartedAt: "08/07/2025 10:15",
-    history: [
-      { datetime: "08/07/2025 09:30", description: "Orçamento criado." },
-      { datetime: "08/07/2025 10:15", description: "Análise iniciada." },
-    ],
-    createdAt: "08/07/2025 09:30",
-  },
-  {
-    id: 102,
-    clientName: "Fernando Costa",
-    phone: "",
-    description: "Studio 35m², Moema",
-    items: [
-      { id: 1, title: "Demolição", description: "", amount: "5000" },
-      { id: 2, title: "Hidráulica e elétrica", description: "", amount: "18000" },
-      { id: 3, title: "Piso e revestimentos", description: "", amount: "16000" },
-      { id: 4, title: "Pintura", description: "", amount: "9000" },
-    ],
-    budgeted: 48000,
-    contractValue: 57600,
-    urgency: "Urgente",
-    quoteDeadline: "15/07/2025",
-    startDate: "",
-    endDate: "",
-    status: "Solicitado",
-    history: [
-      { datetime: "07/07/2025 14:15", description: "Orçamento criado." },
-    ],
-    createdAt: "07/07/2025 14:15",
-  },
-  {
-    id: 103,
-    clientName: "Mariana Luz",
-    phone: "",
-    description: "Studio 52m², Pinheiros",
-    items: [
-      { id: 1, title: "Demolição completa", description: "", amount: "9000" },
-      { id: 2, title: "Hidráulica", description: "", amount: "14000" },
-      { id: 3, title: "Elétrica", description: "", amount: "11000" },
-      { id: 4, title: "Porcelanato e piso aquecido", description: "", amount: "28000" },
-      { id: 5, title: "Pintura e gesso", description: "", amount: "17000" },
-    ],
-    budgeted: 79000,
-    contractValue: 94800,
-    urgency: "Planejado",
-    quoteDeadline: "30/06/2025",
-    startDate: "",
-    endDate: "",
-    status: "Aprovado",
-    history: [
-      { datetime: "20/06/2025 11:00", description: "Orçamento criado." },
-      { datetime: "22/06/2025 09:00", description: "Análise iniciada." },
-      { datetime: "28/06/2025 15:30", description: "Orçamento aprovado." },
-    ],
-    createdAt: "20/06/2025 11:00",
-  },
-  {
-    id: 104,
-    clientName: "Paulo Andrade",
-    phone: "",
-    description: "Studio 40m², Jardins",
-    items: [
-      { id: 1, title: "Demolição", description: "", amount: "6000" },
-      { id: 2, title: "Revestimentos", description: "", amount: "19000" },
-    ],
-    budgeted: 25000,
-    contractValue: 30000,
-    urgency: "Normal",
-    startDate: "",
-    endDate: "",
-    status: "Cancelado",
-    cancellationReason: "Cliente desistiu do projeto após análise do escopo.",
-    history: [
-      { datetime: "01/06/2025 10:00", description: "Orçamento criado." },
-      { datetime: "03/06/2025 11:00", description: "Análise iniciada." },
-      { datetime: "10/06/2025 16:00", description: "Orçamento cancelado — Motivo: Cliente desistiu do projeto após análise do escopo." },
-    ],
-    createdAt: "01/06/2025 10:00",
-  },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -3553,8 +3218,12 @@ function ReportModal({ project, onClose }: { project: Project; onClose: () => vo
 
 // ─── Bottom Navigation ────────────────────────────────────────────────────────
 
-function ContractorsScreen() {
-  const [contractors, setContractors] = useState<Contractor[]>(INITIAL_CONTRACTORS);
+function ContractorsScreen({ contractors, onAdd, onToggleStatus, onRemove }: {
+  contractors: Contractor[];
+  onAdd: (form: Omit<Contractor, "id">) => void;
+  onToggleStatus: (id: number) => void;
+  onRemove: (id: number) => void;
+}) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<Omit<Contractor, "id">>({ name: "", phone: "", specialty: "", status: "Ativo", notes: "" });
 
@@ -3562,15 +3231,10 @@ function ContractorsScreen() {
 
   const handleAdd = () => {
     if (!form.name.trim() || !form.specialty) return;
-    setContractors(prev => [...prev, { ...form, id: Date.now() }]);
+    onAdd(form);
     setForm({ name: "", phone: "", specialty: "", status: "Ativo", notes: "" });
     setShowForm(false);
   };
-
-  const toggleStatus = (id: number) =>
-    setContractors(prev => prev.map(c => c.id === id ? { ...c, status: c.status === "Ativo" ? "Inativo" : "Ativo" } : c));
-
-  const remove = (id: number) => setContractors(prev => prev.filter(c => c.id !== id));
 
   const active = contractors.filter(c => c.status === "Ativo");
   const inactive = contractors.filter(c => c.status === "Inativo");
@@ -3650,11 +3314,11 @@ function ContractorsScreen() {
                     {c.notes && <p className="text-xs text-muted-foreground mt-1 italic">{c.notes}</p>}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => toggleStatus(c.id)}
+                    <button onClick={() => onToggleStatus(c.id)}
                       className="text-[10px] px-2 py-1 rounded border border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">
                       Ativo
                     </button>
-                    <button onClick={() => remove(c.id)} className="p-1.5 text-muted-foreground hover:text-red-400 transition-colors">
+                    <button onClick={() => onRemove(c.id)} className="p-1.5 text-muted-foreground hover:text-red-400 transition-colors">
                       <Trash2 size={13} />
                     </button>
                   </div>
@@ -3677,11 +3341,11 @@ function ContractorsScreen() {
                     {c.phone && <p className="text-xs text-muted-foreground mt-1"><Phone size={10} className="inline mr-1" />{c.phone}</p>}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => toggleStatus(c.id)}
+                    <button onClick={() => onToggleStatus(c.id)}
                       className="text-[10px] px-2 py-1 rounded border border-border bg-muted text-muted-foreground hover:border-emerald-800/40 hover:bg-emerald-900/20 hover:text-emerald-400 transition-colors">
                       Inativo
                     </button>
-                    <button onClick={() => remove(c.id)} className="p-1.5 text-muted-foreground hover:text-red-400 transition-colors">
+                    <button onClick={() => onRemove(c.id)} className="p-1.5 text-muted-foreground hover:text-red-400 transition-colors">
                       <Trash2 size={13} />
                     </button>
                   </div>
@@ -3733,15 +3397,45 @@ function BottomNav({ active, onChange }: { active: Screen; onChange: (s: Screen)
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("dashboard");
-  const [selectedProject, setSelectedProject] = useState<Project>(PROJECTS[0]);
-  const [projects, setProjects] = useState<Project[]>(PROJECTS);
-  const [quotes, setQuotes] = useState<QuoteRecord[]>(MOCK_QUOTES);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [quotes, setQuotes] = useState<QuoteRecord[]>([]);
+  const [contractors, setContractors] = useState<Contractor[]>([]);
   const [selectedQuote, setSelectedQuote] = useState<QuoteRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      projectsApi.list(),
+      quotesApi.list(),
+      contractorsApi.list(),
+    ])
+      .then(([p, q, c]) => {
+        setProjects(p);
+        setQuotes(q);
+        setContractors(c);
+      })
+      .catch(e => setLoadError((e as Error).message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // ─── Project handlers ──────────────────────────────────────────────────────
 
   const handleOpenProject = (p: Project) => {
     setSelectedProject(p);
     setScreen("detail");
   };
+
+  const handleUpdateProject = (updated: Project) => {
+    setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
+    setSelectedProject(updated);
+    projectsApi.update(updated.id, updated).catch(e =>
+      console.error("Failed to update project:", e)
+    );
+  };
+
+  // ─── Quote handlers ────────────────────────────────────────────────────────
 
   const handleOpenQuote = (q: QuoteRecord) => {
     setSelectedQuote(q);
@@ -3751,12 +3445,14 @@ export default function App() {
   const handleUpdateQuote = (updated: QuoteRecord) => {
     setQuotes(prev => prev.map(q => q.id === updated.id ? updated : q));
     setSelectedQuote(updated);
+    quotesApi.update(updated.id, updated).catch(e =>
+      console.error("Failed to update quote:", e)
+    );
   };
 
   const handleGenerateProject = (q: QuoteRecord) => {
     const lastName = q.clientName.split(" ").pop() ?? q.clientName;
-    const newProject: Project = {
-      id: Date.now(),
+    const payload: Omit<Project, "id"> = {
       name: `Studio ${lastName}`,
       client: q.clientName,
       status: "Em andamento",
@@ -3779,20 +3475,91 @@ export default function App() {
       photos: [],
       phase: "Iniciando",
       location: "–",
-      image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&h=500&fit=crop&auto=format",
+      image: "",
       startDate: q.startDate || "–",
       endDate: q.endDate || "–",
-      quoteDeadline: q.quoteDeadline,
+      quoteDeadline: q.quoteDeadline ?? "",
     };
-    setProjects(prev => [...prev, newProject]);
-    setScreen("dashboard");
+    projectsApi.create(payload)
+      .then(created => {
+        setProjects(prev => [...prev, created]);
+        setScreen("dashboard");
+      })
+      .catch(e => console.error("Failed to generate project:", e));
   };
 
   const handleQuoteCreated = (q: QuoteRecord) => {
     setQuotes(prev => [q, ...prev]);
   };
 
+  // ─── Contractor handlers ───────────────────────────────────────────────────
+
+  const handleAddContractor = (form: Omit<Contractor, "id">) => {
+    const tempId = Date.now();
+    const optimistic: Contractor = { ...form, id: tempId };
+    setContractors(prev => [...prev, optimistic]);
+    contractorsApi.create(form)
+      .then(created => setContractors(prev => prev.map(c => c.id === tempId ? created : c)))
+      .catch(e => {
+        console.error("Failed to add contractor:", e);
+        setContractors(prev => prev.filter(c => c.id !== tempId));
+      });
+  };
+
+  const handleToggleContractorStatus = (id: number) => {
+    setContractors(prev => prev.map(c =>
+      c.id === id ? { ...c, status: c.status === "Ativo" ? "Inativo" as const : "Ativo" as const } : c
+    ));
+    const c = contractors.find(x => x.id === id);
+    if (!c) return;
+    const newStatus = c.status === "Ativo" ? "Inativo" as const : "Ativo" as const;
+    contractorsApi.update(id, { status: newStatus }).catch(e => {
+      console.error("Failed to update contractor:", e);
+      setContractors(prev => prev.map(x => x.id === id ? c : x));
+    });
+  };
+
+  const handleRemoveContractor = (id: number) => {
+    const snapshot = contractors.find(c => c.id === id);
+    setContractors(prev => prev.filter(c => c.id !== id));
+    contractorsApi.remove(id).catch(e => {
+      console.error("Failed to remove contractor:", e);
+      if (snapshot) setContractors(prev => [...prev, snapshot]);
+    });
+  };
+
+  // ─── Loading / error states ────────────────────────────────────────────────
+
   const showNav = screen === "dashboard" || screen === "quotes" || screen === "newQuote" || screen === "empreiteiros";
+
+  if (loading) {
+    return (
+      <div className="w-full min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <HardHat size={32} className="mx-auto text-muted-foreground/40 animate-pulse" />
+          <p className="text-sm text-muted-foreground">Carregando…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="w-full min-h-screen bg-background flex items-center justify-center px-6">
+        <div className="text-center space-y-3">
+          <AlertTriangle size={32} className="mx-auto text-red-400" />
+          <p className="text-sm font-medium text-foreground">Erro ao carregar dados</p>
+          <p className="text-xs text-muted-foreground">{loadError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-xs px-4 py-2 bg-accent text-accent-foreground rounded-lg"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full min-h-screen bg-background" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -3803,14 +3570,11 @@ export default function App() {
           onNewProject={() => setScreen("newQuote")}
         />
       )}
-      {screen === "detail" && (
+      {screen === "detail" && selectedProject && (
         <ProjectDetail
           project={selectedProject}
           onBack={() => setScreen("dashboard")}
-          onUpdateProject={updated => {
-            setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
-            setSelectedProject(updated);
-          }}
+          onUpdateProject={handleUpdateProject}
         />
       )}
       {screen === "newQuote" && (
@@ -3830,7 +3594,14 @@ export default function App() {
           onGenerateProject={handleGenerateProject}
         />
       )}
-      {screen === "empreiteiros" && <ContractorsScreen />}
+      {screen === "empreiteiros" && (
+        <ContractorsScreen
+          contractors={contractors}
+          onAdd={handleAddContractor}
+          onToggleStatus={handleToggleContractorStatus}
+          onRemove={handleRemoveContractor}
+        />
+      )}
       {showNav && (
         <BottomNav active={screen} onChange={setScreen} />
       )}
