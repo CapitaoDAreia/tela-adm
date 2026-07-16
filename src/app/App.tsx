@@ -1818,10 +1818,14 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
             "Pendente":    "bg-muted-foreground/40",
             "Cancelado":   "bg-red-500/50",
           };
-          const months: string[] = [];
+          const monthNames = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+          const monthMarkers: { label: string; pos: number }[] = [];
           const cur = new Date(projStart.getFullYear(), projStart.getMonth(), 1);
           while (cur <= projEnd) {
-            months.push(cur.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }));
+            monthMarkers.push({
+              label: `${monthNames[cur.getMonth()]}/${String(cur.getFullYear()).slice(-2)}`,
+              pos: pct(new Date(cur)),
+            });
             cur.setMonth(cur.getMonth() + 1);
           }
           return (
@@ -1833,15 +1837,19 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                 </span>
               </div>
 
-              {/* Régua de meses */}
-              <div className="relative h-5 border-b border-border">
-                {months.map((m, i) => (
-                  <span
-                    key={i}
-                    className="absolute text-[9px] text-muted-foreground font-mono -translate-x-1/2"
-                    style={{ left: `${(i / Math.max(months.length - 1, 1)) * 100}%`, top: 0 }}
-                  >{m}</span>
-                ))}
+              {/* Régua de meses — alinhada à coluna das barras */}
+              <div className="flex items-end gap-3">
+                <div className="w-36 shrink-0" />
+                <div className="relative flex-1 h-4">
+                  {monthMarkers.map((mk, i) => (
+                    <span
+                      key={i}
+                      className="absolute text-[9px] text-muted-foreground font-mono whitespace-nowrap"
+                      style={{ left: `${mk.pos}%`, bottom: 0 }}
+                    >{mk.label}</span>
+                  ))}
+                </div>
+                <div className="w-24 shrink-0" />
               </div>
 
               {/* Barras das etapas */}
@@ -1852,16 +1860,20 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                   const end   = parseD(m.deadline) ?? start;
                   if (!start || !end) return null;
                   const left  = pct(start);
-                  const width = Math.max(1, pct(end) - left);
+                  const width = Math.max(1.5, pct(end) - left);
                   const cfg = STEP_STATUS_CONFIG[m.status];
                   return (
                     <div key={i} className="flex items-center gap-3">
-                      <div className="w-32 shrink-0 text-right">
-                        <span className="text-[11px] text-foreground leading-tight line-clamp-1">{m.label}</span>
+                      <div className="w-36 shrink-0 text-right">
+                        <span className="text-[11px] text-foreground leading-tight line-clamp-2">{m.label}</span>
                       </div>
                       <div className="relative flex-1 h-6">
+                        {/* gridlines dos meses */}
+                        {monthMarkers.map((mk, j) => (
+                          <div key={j} className="absolute inset-y-0 w-px bg-border/60" style={{ left: `${mk.pos}%` }} />
+                        ))}
                         {/* trilho */}
-                        <div className="absolute inset-y-0 left-0 right-0 rounded-full bg-muted/50" />
+                        <div className="absolute inset-y-0 left-0 right-0 rounded-full bg-muted/40" />
                         {/* barra */}
                         <div
                           className={`absolute inset-y-1 rounded-full ${STATUS_COLORS[m.status]} transition-all`}
@@ -1870,11 +1882,11 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                         />
                         {/* linha hoje */}
                         {todayPct >= 0 && todayPct <= 100 && (
-                          <div className="absolute inset-y-0 w-px bg-red-500/70" style={{ left: `${todayPct}%` }} />
+                          <div className="absolute inset-y-0 w-0.5 bg-red-500 z-10" style={{ left: `${todayPct}%` }} />
                         )}
                       </div>
-                      <div className="w-16 shrink-0">
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded border ${cfg.color}`}>{cfg.label}</span>
+                      <div className="w-24 shrink-0">
+                        <span className={`inline-block whitespace-nowrap text-[9px] px-1.5 py-0.5 rounded border ${cfg.color}`}>{cfg.label}</span>
                       </div>
                     </div>
                   );
