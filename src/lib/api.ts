@@ -6,161 +6,200 @@ import type {
   QuoteRecord,
   Contractor,
 } from "./types";
+import db from "../../db.json";
 
-// ─── Base ─────────────────────────────────────────────────────────────────────
+// ─── In-memory store (inicializado a partir de db.json) ───────────────────────
+//
+// Todas as operações operam sobre este store em memória.
+// Alterações persistem durante a sessão mas não sobrevivem ao reload — ok para protótipo.
+// Para conectar ao backend real: substituir cada função por um fetch() equivalente.
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:3000";
+const store = {
+  projects:    structuredClone(db.projects)    as Project[],
+  quotes:      structuredClone(db.quotes)      as QuoteRecord[],
+  contractors: structuredClone(db.contractors) as Contractor[],
+};
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText);
-    throw new Error(`${res.status}: ${text}`);
-  }
-  if (res.status === 204) return undefined as unknown as T;
-  return res.json() as Promise<T>;
-}
+const ok  = <T>(data: T) => Promise.resolve(data);
+const noop = ()           => Promise.resolve();
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
 
 export const projectsApi = {
   list: () =>
-    request<Project[]>("/projects"),
+    ok([...store.projects]),
 
   get: (id: number) =>
-    request<Project>(`/projects/${id}`),
+    ok(store.projects.find(p => p.id === id)!),
 
-  create: (data: Omit<Project, "id">) =>
-    request<Project>("/projects", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+  create: (data: Omit<Project, "id">) => {
+    const created = { ...data, id: Date.now() } as Project;
+    store.projects.push(created);
+    return ok(created);
+  },
 
-  update: (id: number, data: Partial<Project>) =>
-    request<Project>(`/projects/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
+  update: (id: number, data: Partial<Project>) => {
+    const idx = store.projects.findIndex(p => p.id === id);
+    if (idx !== -1) store.projects[idx] = { ...store.projects[idx], ...data };
+    return ok(store.projects[idx]);
+  },
 };
 
 // ─── Milestones ───────────────────────────────────────────────────────────────
 
 export const milestonesApi = {
-  list: (projectId: number) =>
-    request<Milestone[]>(`/projects/${projectId}/milestones`),
+  list: (projectId: number) => {
+    const p = store.projects.find(p => p.id === projectId);
+    return ok([...(p?.milestones ?? [])]);
+  },
 
-  create: (projectId: number, data: Omit<Milestone, "id">) =>
-    request<Milestone>(`/projects/${projectId}/milestones`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+  create: (projectId: number, data: Omit<Milestone, "id">) => {
+    const created = { ...data, id: Date.now() } as Milestone;
+    const p = store.projects.find(p => p.id === projectId);
+    p?.milestones.push(created);
+    return ok(created);
+  },
 
-  update: (projectId: number, milestoneId: number, data: Partial<Milestone>) =>
-    request<Milestone>(`/projects/${projectId}/milestones/${milestoneId}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
+  update: (projectId: number, milestoneId: number, data: Partial<Milestone>) => {
+    const p = store.projects.find(p => p.id === projectId);
+    const idx = p?.milestones.findIndex(m => m.id === milestoneId) ?? -1;
+    if (p && idx !== -1) p.milestones[idx] = { ...p.milestones[idx], ...data };
+    return ok(p!.milestones[idx]);
+  },
 
-  remove: (projectId: number, milestoneId: number) =>
-    request<void>(`/projects/${projectId}/milestones/${milestoneId}`, {
-      method: "DELETE",
-    }),
+  remove: (projectId: number, milestoneId: number) => {
+    const p = store.projects.find(p => p.id === projectId);
+    if (p) p.milestones = p.milestones.filter(m => m.id !== milestoneId);
+    return noop();
+  },
 };
 
 // ─── Expenses ─────────────────────────────────────────────────────────────────
 
 export const expensesApi = {
-  list: (projectId: number) =>
-    request<Expense[]>(`/projects/${projectId}/expenses`),
+  list: (projectId: number) => {
+    const p = store.projects.find(p => p.id === projectId);
+    return ok([...(p?.expenses ?? [])]);
+  },
 
-  create: (projectId: number, data: Omit<Expense, "id">) =>
-    request<Expense>(`/projects/${projectId}/expenses`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+  create: (projectId: number, data: Omit<Expense, "id">) => {
+    const created = { ...data, id: Date.now() } as Expense;
+    const p = store.projects.find(p => p.id === projectId);
+    p?.expenses.push(created);
+    return ok(created);
+  },
 
-  update: (projectId: number, expenseId: number, data: Partial<Expense>) =>
-    request<Expense>(`/projects/${projectId}/expenses/${expenseId}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
+  update: (projectId: number, expenseId: number, data: Partial<Expense>) => {
+    const p = store.projects.find(p => p.id === projectId);
+    const idx = p?.expenses.findIndex(e => e.id === expenseId) ?? -1;
+    if (p && idx !== -1) p.expenses[idx] = { ...p.expenses[idx], ...data };
+    return ok(p!.expenses[idx]);
+  },
 
-  remove: (projectId: number, expenseId: number) =>
-    request<void>(`/projects/${projectId}/expenses/${expenseId}`, {
-      method: "DELETE",
-    }),
+  remove: (projectId: number, expenseId: number) => {
+    const p = store.projects.find(p => p.id === projectId);
+    if (p) p.expenses = p.expenses.filter(e => e.id !== expenseId);
+    return noop();
+  },
 };
 
 // ─── Photos ───────────────────────────────────────────────────────────────────
 
 export const photosApi = {
-  list: (projectId: number) =>
-    request<ProjectPhoto[]>(`/projects/${projectId}/photos`),
+  list: (projectId: number) => {
+    const p = store.projects.find(p => p.id === projectId);
+    return ok([...(p?.photos ?? [])]);
+  },
 
-  // Multipart upload — caller builds the FormData
-  upload: (projectId: number, formData: FormData) =>
-    fetch(`${BASE_URL}/projects/${projectId}/photos`, {
-      method: "POST",
-      body: formData,
-    }).then(async res => {
-      if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
-      return res.json() as Promise<ProjectPhoto>;
-    }),
+  upload: (_projectId: number, _formData: FormData) =>
+    ok({ id: Date.now(), url: "", caption: "", date: "" } as ProjectPhoto),
 
-  remove: (projectId: number, photoId: number) =>
-    request<void>(`/projects/${projectId}/photos/${photoId}`, {
-      method: "DELETE",
-    }),
+  remove: (projectId: number, photoId: number) => {
+    const p = store.projects.find(p => p.id === projectId);
+    if (p) p.photos = p.photos.filter(ph => ph.id !== photoId);
+    return noop();
+  },
 };
 
 // ─── Quotes ───────────────────────────────────────────────────────────────────
 
 export const quotesApi = {
   list: () =>
-    request<QuoteRecord[]>("/quotes"),
+    ok([...store.quotes]),
 
   get: (id: number) =>
-    request<QuoteRecord>(`/quotes/${id}`),
+    ok(store.quotes.find(q => q.id === id)!),
 
-  create: (data: Omit<QuoteRecord, "id">) =>
-    request<QuoteRecord>("/quotes", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+  create: (data: Omit<QuoteRecord, "id">) => {
+    const created = { ...data, id: Date.now() } as QuoteRecord;
+    store.quotes.unshift(created);
+    return ok(created);
+  },
 
-  update: (id: number, data: Partial<QuoteRecord>) =>
-    request<QuoteRecord>(`/quotes/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
+  update: (id: number, data: Partial<QuoteRecord>) => {
+    const idx = store.quotes.findIndex(q => q.id === id);
+    if (idx !== -1) store.quotes[idx] = { ...store.quotes[idx], ...data };
+    return ok(store.quotes[idx]);
+  },
 
-  generateProject: (quoteId: number) =>
-    request<Project>(`/quotes/${quoteId}/generate-project`, {
-      method: "POST",
-    }),
+  generateProject: (quoteId: number) => {
+    const q = store.quotes.find(q => q.id === quoteId)!;
+    const lastName = q.clientName.split(" ").pop() ?? q.clientName;
+    const created: Project = {
+      id: Date.now(),
+      name: `Studio ${lastName}`,
+      client: q.clientName,
+      status: "Em andamento",
+      progress: 0,
+      budgeted: q.budgeted,
+      contractValue: q.contractValue,
+      spent: 0,
+      expenses: [],
+      milestones: q.items.map((item, i) => ({
+        id: i + 1,
+        label: item.title,
+        done: false,
+        date: "",
+        status: "Pendente",
+        description: item.description,
+        startDate: "",
+        deadline: "",
+        completedAt: "",
+        photos: [],
+      })),
+      photos: [],
+      phase: "Iniciando",
+      location: "–",
+      image: "",
+      startDate: q.startDate || "–",
+      endDate: q.endDate || "–",
+      quoteDeadline: q.quoteDeadline ?? "",
+    };
+    store.projects.push(created);
+    return ok(created);
+  },
 };
 
 // ─── Contractors ──────────────────────────────────────────────────────────────
 
 export const contractorsApi = {
   list: () =>
-    request<Contractor[]>("/contractors"),
+    ok([...store.contractors]),
 
-  create: (data: Omit<Contractor, "id">) =>
-    request<Contractor>("/contractors", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+  create: (data: Omit<Contractor, "id">) => {
+    const created = { ...data, id: Date.now() } as Contractor;
+    store.contractors.push(created);
+    return ok(created);
+  },
 
-  update: (id: number, data: Partial<Contractor>) =>
-    request<Contractor>(`/contractors/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
+  update: (id: number, data: Partial<Contractor>) => {
+    const idx = store.contractors.findIndex(c => c.id === id);
+    if (idx !== -1) store.contractors[idx] = { ...store.contractors[idx], ...data };
+    return ok(store.contractors[idx]);
+  },
 
-  remove: (id: number) =>
-    request<void>(`/contractors/${id}`, { method: "DELETE" }),
+  remove: (id: number) => {
+    store.contractors = store.contractors.filter(c => c.id !== id);
+    return noop();
+  },
 };
