@@ -833,6 +833,7 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
   const [pickedTemplate, setPickedTemplate] = useState<string | null>(null);
   const [workerNote, setWorkerNote] = useState("");
   const [pendingStatus, setPendingStatus] = useState<StepStatus | null>(null);
+  const [pendingMatChange, setPendingMatChange] = useState<{ id: number; newStatus: "Pendente" | "Pedido" | "Recebido" } | null>(null);
   const [extendingDeadline, setExtendingDeadline] = useState(false);
   const [newDeadline, setNewDeadline] = useState("");
   const [extensionReason, setExtensionReason] = useState("");
@@ -1114,32 +1115,55 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
             </div>
             <div className="px-4 py-3 space-y-2">
               {(draft.materials ?? []).map((mat, i) => (
-                <div key={mat.id} className="flex items-center gap-2">
-                  <select
-                    value={mat.status}
-                    onChange={e => {
-                      const mats = [...(draft.materials ?? [])];
-                      mats[i] = { ...mat, status: e.target.value as typeof mat.status };
-                      setDraft({ ...draft, materials: mats });
-                    }}
-                    className={`text-[10px] px-2 py-1 rounded border outline-none shrink-0 ${
-                      mat.status === "Recebido" ? "bg-emerald-900/30 text-emerald-400 border-emerald-800/40" :
-                      mat.status === "Pedido"   ? "bg-blue-900/30 text-blue-400 border-blue-800/40" :
-                      "bg-muted text-muted-foreground border-border"
-                    }`}
-                  >
-                    <option>Pendente</option>
-                    <option>Pedido</option>
-                    <option>Recebido</option>
-                  </select>
-                  <span className="text-sm text-foreground flex-1">{mat.description}</span>
-                  <button
-                    type="button"
-                    onClick={() => setDraft({ ...draft, materials: (draft.materials ?? []).filter((_, j) => j !== i) })}
-                    className="p-1 text-muted-foreground hover:text-red-400 transition-colors"
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                <div key={mat.id} className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    {/* Status chip clicável */}
+                    {(["Pendente","Pedido","Recebido"] as const).map(s => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => s !== mat.status && setPendingMatChange({ id: mat.id, newStatus: s })}
+                        className={`text-[10px] px-2 py-0.5 rounded border transition-colors shrink-0 ${
+                          mat.status === s
+                            ? s === "Recebido" ? "bg-emerald-900/30 text-emerald-400 border-emerald-800/40 font-semibold"
+                            : s === "Pedido"   ? "bg-blue-900/30 text-blue-400 border-blue-800/40 font-semibold"
+                            : "bg-muted text-muted-foreground border-border font-semibold"
+                            : "bg-transparent text-muted-foreground/50 border-border/50 hover:border-muted-foreground hover:text-muted-foreground"
+                        }`}
+                      >{s}</button>
+                    ))}
+                    <span className="text-sm text-foreground flex-1">{mat.description}</span>
+                    <button
+                      type="button"
+                      onClick={() => setDraft({ ...draft, materials: (draft.materials ?? []).filter((_, j) => j !== i) })}
+                      className="p-1 text-muted-foreground hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                  {/* Confirmação de mudança de status */}
+                  {pendingMatChange?.id === mat.id && (
+                    <div className="ml-1 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 flex items-center justify-between gap-3">
+                      <p className="text-xs text-foreground">
+                        Marcar como <span className="font-semibold">{pendingMatChange.newStatus}</span>?
+                      </p>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => setPendingMatChange(null)}
+                          className="text-xs px-2.5 py-1 rounded bg-muted text-muted-foreground hover:bg-secondary transition-colors">
+                          Cancelar
+                        </button>
+                        <button type="button" onClick={() => {
+                          const mats = [...(draft.materials ?? [])];
+                          const idx = mats.findIndex(m => m.id === mat.id);
+                          if (idx >= 0) mats[idx] = { ...mats[idx], status: pendingMatChange.newStatus };
+                          setDraft({ ...draft, materials: mats });
+                          setPendingMatChange(null);
+                        }} className="text-xs px-2.5 py-1 rounded bg-accent text-accent-foreground hover:bg-accent/80 transition-colors">
+                          Confirmar
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               <div className="flex gap-2 pt-1">
@@ -1743,6 +1767,18 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                       )}
                     </div>
                   </div>
+                  {/* Materiais pendentes */}
+                  {(m.materials ?? []).length > 0 && (
+                    <div className={`flex items-center gap-1 shrink-0 ${
+                      (m.materials ?? []).some(mat => mat.status === "Pendente") ? "text-amber-500" : "text-muted-foreground"
+                    }`}>
+                      <PackagePlus size={12} />
+                      <span className="text-[10px]">
+                        {(m.materials ?? []).filter(mat => mat.status === "Pendente").length}/
+                        {(m.materials ?? []).length}
+                      </span>
+                    </div>
+                  )}
                   {m.photos.length > 0 && (
                     <div className="flex items-center gap-1 text-muted-foreground shrink-0">
                       <Camera size={12} />
@@ -1811,7 +1847,8 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
               {/* Barras das etapas */}
               <div className="space-y-2.5">
                 {milestones.map((m, i) => {
-                  const start = parseD(m.startDate ?? "") ?? parseD(m.deadline);
+                  const prevEnd = i === 0 ? projStart : (parseD(milestones[i - 1].deadline) ?? projStart);
+                  const start = parseD(m.startDate ?? "") ?? prevEnd;
                   const end   = parseD(m.deadline) ?? start;
                   if (!start || !end) return null;
                   const left  = pct(start);
@@ -3555,7 +3592,7 @@ function ContractorsScreen() {
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button onClick={() => toggleStatus(c.id)}
-                      className="text-[10px] px-2 py-1 rounded border border-emerald-800/40 bg-emerald-900/20 text-emerald-400 hover:bg-emerald-900/40 transition-colors">
+                      className="text-[10px] px-2 py-1 rounded border border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">
                       Ativo
                     </button>
                     <button onClick={() => remove(c.id)} className="p-1.5 text-muted-foreground hover:text-red-400 transition-colors">
