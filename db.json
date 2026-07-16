@@ -1,0 +1,250 @@
+{
+  "projects": [
+    {
+      "id": 1,
+      "name": "Studio Monteiro",
+      "client": "Rafael Monteiro",
+      "status": "Em andamento",
+      "progress": 62,
+      "contractValue": 104400,
+      "budgeted": 87000,
+      "spent": 53940,
+      "phase": "Acabamento – piso e pintura",
+      "location": "Ap. 74 · Ed. Araucária, Pinheiros – SP",
+      "startDate": "10/03/2025",
+      "endDate": "29/08/2025",
+      "quoteDeadline": "28/02/2025",
+      "image": "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&h=500&fit=crop&auto=format",
+      "cancelReason": null,
+      "expenses": [
+        { "id": 1, "date": "02 Jul 2025", "description": "Porcelanato 60×60 – área social", "category": "Material", "amount": 4800 },
+        { "id": 2, "date": "28 Jun 2025", "description": "Mão de obra – pintura interna", "category": "Serviço", "amount": 2900 },
+        { "id": 3, "date": "21 Jun 2025", "description": "Instalação elétrica – pontos extras", "category": "Serviço", "amount": 1950 },
+        { "id": 4, "date": "15 Jun 2025", "description": "Bancada de quartzo – cozinha compacta", "category": "Material", "amount": 3400 },
+        { "id": 5, "date": "07 Jun 2025", "description": "Louças e metais – banheiro", "category": "Material", "amount": 2750 },
+        { "id": 6, "date": "08 Jul 2025", "description": "Parcela 4/6 – equipe Monteiro", "category": "Serviço", "amount": 6200, "isPayment": true, "paymentStatus": "A fazer", "dueDate": "2025-07-15" },
+        { "id": 7, "date": "08 Jul 2025", "description": "Fornecedor Pedreira Boa Vista", "category": "Material", "amount": 3800, "isPayment": true, "paymentStatus": "A fazer", "dueDate": "2025-07-20" }
+      ],
+      "milestones": [
+        { "id": 1, "label": "Demolição e limpeza", "done": true, "date": "Mar 2025", "status": "Concluído", "description": "Remoção do revestimento existente, demolição de paredes não estruturais e limpeza completa do apartamento.", "startDate": "10/03/2025", "startedAt": "11/03/2025", "deadline": "20/03/2025", "completedAt": "18/03/2025", "photos": ["https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=400&h=300&fit=crop"], "materials": [] },
+        { "id": 2, "label": "Instalações hidráulicas", "done": true, "date": "Abr 2025", "status": "Concluído", "description": "Substituição de toda a tubulação de água fria, quente e esgoto do banheiro e cozinha compacta.", "startDate": "24/03/2025", "startedAt": "25/03/2025", "deadline": "30/04/2025", "completedAt": "28/04/2025", "photos": [], "materials": [] },
+        { "id": 3, "label": "Instalações elétricas", "done": true, "date": "Mai 2025", "status": "Concluído", "description": "Passagem de fiação nova, instalação de quadro de distribuição e pontos de tomada conforme projeto.", "startDate": "05/05/2025", "startedAt": "06/05/2025", "deadline": "30/05/2025", "completedAt": "27/05/2025", "photos": [], "materials": [] },
+        { "id": 4, "label": "Revestimentos e piso", "done": false, "date": "Jul 2025", "status": "Em andamento", "description": "Assentamento de porcelanato 60×60 na área social e banheiro, incluindo rejunte e rodapés.", "startDate": "02/06/2025", "startedAt": "10/07/2025", "deadline": "25/07/2025", "completedAt": "", "photos": [], "materials": [
+          { "id": 1, "description": "Porcelanato 60×60 (caixa 2,5m²)", "status": "Recebido" },
+          { "id": 2, "description": "Rejunte cinza médio", "status": "Pedido" },
+          { "id": 3, "description": "Espaçador de piso 3mm", "status": "Pendente" }
+        ]},
+        { "id": 5, "label": "Pintura e acabamentos", "done": false, "date": "Ago 2025", "status": "Pendente", "description": "Aplicação de massa corrida, tinta látex premium em todas as paredes e teto, instalação de luminárias.", "startDate": "28/07/2025", "deadline": "29/08/2025", "completedAt": "", "photos": [], "materials": [
+          { "id": 1, "description": "Tinta látex premium 18L (4 latas)", "status": "Pendente" },
+          { "id": 2, "description": "Massa corrida 25kg (3 sacos)", "status": "Pendente" }
+        ]}
+      ],
+      "photos": [
+        { "id": 1, "url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600&h=400&fit=crop&auto=format", "caption": "Cozinha compacta – pré-acabamento", "date": "30 Jun 2025" },
+        { "id": 2, "url": "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=600&h=400&fit=crop&auto=format", "caption": "Área integrada – reboco pronto", "date": "22 Jun 2025" },
+        { "id": 3, "url": "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?w=600&h=400&fit=crop&auto=format", "caption": "Banheiro – azulejo assentado", "date": "14 Jun 2025" }
+      ],
+      "history": []
+    },
+    {
+      "id": 2,
+      "name": "Studio Ferreira",
+      "client": "Camila Ferreira",
+      "status": "Em andamento",
+      "progress": 38,
+      "contractValue": 88800,
+      "budgeted": 74000,
+      "spent": 28120,
+      "phase": "Alvenaria e instalações",
+      "location": "Ap. 32 · Ed. Vila Nova, Vila Madalena – SP",
+      "startDate": "05/05/2025",
+      "endDate": "31/10/2025",
+      "quoteDeadline": "25/04/2025",
+      "image": "https://images.unsplash.com/photo-1554995207-c18c203602cb?w=800&h=500&fit=crop&auto=format",
+      "cancelReason": null,
+      "expenses": [
+        { "id": 1, "date": "03 Jul 2025", "description": "Tijolo de vedação – paredes divisórias", "category": "Material", "amount": 1800 },
+        { "id": 2, "date": "01 Jul 2025", "description": "Mão de obra – alvenaria", "category": "Serviço", "amount": 3200 },
+        { "id": 3, "date": "25 Jun 2025", "description": "Tubulação hidráulica – banheiro e cozinha", "category": "Material", "amount": 1450 },
+        { "id": 4, "date": "08 Jul 2025", "description": "Parcela 2/4 – equipe Ferreira", "category": "Serviço", "amount": 4500, "isPayment": true, "paymentStatus": "A fazer", "dueDate": "2025-07-18" }
+      ],
+      "milestones": [
+        { "id": 1, "label": "Demolição e adequação", "done": true, "date": "Mai 2025", "status": "Concluído", "description": "Demolição de revestimentos e adaptação do layout conforme projeto aprovado.", "startDate": "05/05/2025", "startedAt": "05/05/2025", "deadline": "10/05/2025", "completedAt": "09/05/2025", "photos": ["https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=400&h=300&fit=crop"], "materials": [] },
+        { "id": 2, "label": "Alvenaria e divisórias", "done": false, "date": "Jul 2025", "status": "Em andamento", "description": "Construção das novas divisórias em alvenaria para separação de ambientes conforme planta.", "startDate": "12/05/2025", "startedAt": "15/05/2025", "deadline": "20/07/2025", "completedAt": "", "photos": [], "materials": [] },
+        { "id": 3, "label": "Instalações elétricas e hidráulicas", "done": false, "date": "Ago 2025", "status": "Pendente", "description": "Passagem de tubulações e fiação elétrica completa.", "startDate": "21/07/2025", "deadline": "31/08/2025", "completedAt": "", "photos": [], "materials": [] },
+        { "id": 4, "label": "Revestimentos e piso", "done": false, "date": "Set 2025", "status": "Pendente", "description": "", "startDate": "01/09/2025", "deadline": "30/09/2025", "completedAt": "", "photos": [], "materials": [] },
+        { "id": 5, "label": "Pintura e entrega", "done": false, "date": "Out 2025", "status": "Pendente", "description": "", "startDate": "01/10/2025", "deadline": "31/10/2025", "completedAt": "", "photos": [], "materials": [] }
+      ],
+      "photos": [
+        { "id": 1, "url": "https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=600&h=400&fit=crop&auto=format", "caption": "Demolição concluída", "date": "28 Jun 2025" }
+      ],
+      "history": []
+    },
+    {
+      "id": 3,
+      "name": "Studio Nakamura",
+      "client": "Yuki Nakamura",
+      "status": "Concluído",
+      "progress": 100,
+      "contractValue": 81600,
+      "budgeted": 68000,
+      "spent": 65500,
+      "phase": "Entregue",
+      "location": "Ap. 112 · Ed. Ouro Preto, Consolação – SP",
+      "startDate": "04/11/2024",
+      "endDate": "18/03/2025",
+      "quoteDeadline": "22/10/2024",
+      "image": "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&h=500&fit=crop&auto=format",
+      "cancelReason": null,
+      "expenses": [
+        { "id": 1, "date": "18 Mar 2025", "description": "Móvel planejado – parede multifuncional", "category": "Material", "amount": 9800 },
+        { "id": 2, "date": "10 Mar 2025", "description": "Mão de obra final e limpeza", "category": "Serviço", "amount": 1400 }
+      ],
+      "milestones": [
+        { "id": 1, "label": "Demolição e limpeza", "done": true, "date": "Nov 2024", "status": "Concluído", "description": "Demolição completa do revestimento original.", "startDate": "04/11/2024", "startedAt": "04/11/2024", "deadline": "15/11/2024", "completedAt": "14/11/2024", "photos": [], "materials": [] },
+        { "id": 2, "label": "Instalações elétricas e hidráulicas", "done": true, "date": "Dez 2024", "status": "Concluído", "description": "Toda a infraestrutura de instalações substituída.", "startDate": "18/11/2024", "startedAt": "18/11/2024", "deadline": "20/12/2024", "completedAt": "19/12/2024", "photos": [], "materials": [] },
+        { "id": 3, "label": "Revestimentos e piso", "done": true, "date": "Jan 2025", "status": "Concluído", "description": "Porcelanato assentado em todo o apartamento.", "startDate": "02/01/2025", "startedAt": "03/01/2025", "deadline": "31/01/2025", "completedAt": "28/01/2025", "photos": [], "materials": [] },
+        { "id": 4, "label": "Pintura e acabamentos", "done": true, "date": "Fev 2025", "status": "Concluído", "description": "Pintura e instalações finais concluídas.", "startDate": "03/02/2025", "startedAt": "04/02/2025", "deadline": "28/02/2025", "completedAt": "25/02/2025", "photos": [], "materials": [] },
+        { "id": 5, "label": "Móveis e entrega", "done": true, "date": "Mar 2025", "status": "Concluído", "description": "Instalação de móveis planejados e entrega ao cliente.", "startDate": "03/03/2025", "startedAt": "04/03/2025", "deadline": "20/03/2025", "completedAt": "18/03/2025", "photos": ["https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=400&h=300&fit=crop"], "materials": [] }
+      ],
+      "photos": [
+        { "id": 1, "url": "https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=600&h=400&fit=crop&auto=format", "caption": "Área integrada – entregue", "date": "18 Mar 2025" },
+        { "id": 2, "url": "https://images.unsplash.com/photo-1631679706909-1844bbd07221?w=600&h=400&fit=crop&auto=format", "caption": "Banheiro finalizado", "date": "18 Mar 2025" }
+      ],
+      "history": []
+    },
+    {
+      "id": 4,
+      "name": "Studio Carvalho",
+      "client": "Bruno Carvalho",
+      "status": "Orçamento",
+      "progress": 0,
+      "contractValue": 109200,
+      "budgeted": 91000,
+      "spent": 0,
+      "phase": "Aguardando aprovação",
+      "location": "Ap. 205 · Ed. Parque Sul, Moema – SP",
+      "startDate": "–",
+      "endDate": "–",
+      "quoteDeadline": "18/07/2025",
+      "image": "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&h=500&fit=crop&auto=format",
+      "cancelReason": null,
+      "expenses": [],
+      "milestones": [
+        { "id": 1, "label": "Visita técnica", "done": true, "date": "Jun 2025", "status": "Concluído", "description": "Visita ao apartamento para levantamento e medições.", "startDate": "15/06/2025", "startedAt": "16/06/2025", "deadline": "20/06/2025", "completedAt": "18/06/2025", "photos": [], "materials": [] },
+        { "id": 2, "label": "Aprovação do orçamento", "done": false, "date": "Jul 2025", "status": "Pendente", "description": "Aguardando assinatura do contrato e aprovação formal.", "startDate": "08/07/2025", "deadline": "18/07/2025", "completedAt": "", "photos": [], "materials": [] },
+        { "id": 3, "label": "Início da obra", "done": false, "date": "Ago 2025", "status": "Pendente", "description": "", "startDate": "04/08/2025", "deadline": "04/08/2025", "completedAt": "", "photos": [], "materials": [] }
+      ],
+      "photos": [],
+      "history": []
+    }
+  ],
+  "quotes": [
+    {
+      "id": 101,
+      "clientName": "Isabela Ramos",
+      "phone": "",
+      "description": "Studio 48m², Consolação",
+      "items": [
+        { "id": 1, "title": "Demolição e limpeza", "description": "", "amount": "8000" },
+        { "id": 2, "title": "Instalações hidráulicas", "description": "", "amount": "12000" },
+        { "id": 3, "title": "Revestimentos e piso", "description": "", "amount": "22000" },
+        { "id": 4, "title": "Pintura e acabamentos", "description": "", "amount": "14000" },
+        { "id": 5, "title": "Móveis planejados", "description": "", "amount": "6000" }
+      ],
+      "budgeted": 62000,
+      "contractValue": 74400,
+      "urgency": "Normal",
+      "quoteDeadline": "25/07/2025",
+      "startDate": "",
+      "endDate": "",
+      "status": "Em análise",
+      "analysisStartedAt": "08/07/2025 10:15",
+      "history": [
+        { "datetime": "08/07/2025 09:30", "description": "Orçamento criado." },
+        { "datetime": "08/07/2025 10:15", "description": "Análise iniciada." }
+      ],
+      "createdAt": "08/07/2025 09:30"
+    },
+    {
+      "id": 102,
+      "clientName": "Fernando Costa",
+      "phone": "",
+      "description": "Studio 35m², Moema",
+      "items": [
+        { "id": 1, "title": "Demolição", "description": "", "amount": "5000" },
+        { "id": 2, "title": "Hidráulica e elétrica", "description": "", "amount": "18000" },
+        { "id": 3, "title": "Piso e revestimentos", "description": "", "amount": "16000" },
+        { "id": 4, "title": "Pintura", "description": "", "amount": "9000" }
+      ],
+      "budgeted": 48000,
+      "contractValue": 57600,
+      "urgency": "Urgente",
+      "quoteDeadline": "15/07/2025",
+      "startDate": "",
+      "endDate": "",
+      "status": "Solicitado",
+      "history": [
+        { "datetime": "07/07/2025 14:15", "description": "Orçamento criado." }
+      ],
+      "createdAt": "07/07/2025 14:15"
+    },
+    {
+      "id": 103,
+      "clientName": "Mariana Luz",
+      "phone": "",
+      "description": "Studio 52m², Pinheiros",
+      "items": [
+        { "id": 1, "title": "Demolição completa", "description": "", "amount": "9000" },
+        { "id": 2, "title": "Hidráulica", "description": "", "amount": "14000" },
+        { "id": 3, "title": "Elétrica", "description": "", "amount": "11000" },
+        { "id": 4, "title": "Porcelanato e piso aquecido", "description": "", "amount": "28000" },
+        { "id": 5, "title": "Pintura e gesso", "description": "", "amount": "17000" }
+      ],
+      "budgeted": 79000,
+      "contractValue": 94800,
+      "urgency": "Planejado",
+      "quoteDeadline": "30/06/2025",
+      "startDate": "",
+      "endDate": "",
+      "status": "Aprovado",
+      "history": [
+        { "datetime": "20/06/2025 11:00", "description": "Orçamento criado." },
+        { "datetime": "22/06/2025 09:00", "description": "Análise iniciada." },
+        { "datetime": "28/06/2025 15:30", "description": "Orçamento aprovado." }
+      ],
+      "createdAt": "20/06/2025 11:00"
+    },
+    {
+      "id": 104,
+      "clientName": "Paulo Andrade",
+      "phone": "",
+      "description": "Studio 40m², Jardins",
+      "items": [
+        { "id": 1, "title": "Demolição", "description": "", "amount": "6000" },
+        { "id": 2, "title": "Revestimentos", "description": "", "amount": "19000" }
+      ],
+      "budgeted": 25000,
+      "contractValue": 30000,
+      "urgency": "Normal",
+      "startDate": "",
+      "endDate": "",
+      "status": "Cancelado",
+      "cancellationReason": "Cliente desistiu do projeto após análise do escopo.",
+      "history": [
+        { "datetime": "01/06/2025 10:00", "description": "Orçamento criado." },
+        { "datetime": "03/06/2025 11:00", "description": "Análise iniciada." },
+        { "datetime": "10/06/2025 16:00", "description": "Orçamento cancelado — Motivo: Cliente desistiu do projeto após análise do escopo." }
+      ],
+      "createdAt": "01/06/2025 10:00"
+    }
+  ],
+  "contractors": [
+    { "id": 1, "name": "Carlos Oliveira",  "phone": "(11) 98432-1100", "specialty": "Hidráulica",           "status": "Ativo",   "notes": "Trabalha com equipe de 2 ajudantes." },
+    { "id": 2, "name": "Marcos Ferreira",  "phone": "(11) 97654-3322", "specialty": "Elétrica",              "status": "Ativo",   "notes": "Certificado NR-10. Atende fins de semana." },
+    { "id": 3, "name": "Pedro Santos",     "phone": "(11) 96543-2211", "specialty": "Demolição e alvenaria", "status": "Ativo",   "notes": null },
+    { "id": 4, "name": "João Almeida",     "phone": "(11) 95432-1100", "specialty": "Revestimentos e piso",  "status": "Ativo",   "notes": null },
+    { "id": 5, "name": "Ana Costa",        "phone": "(11) 94321-0099", "specialty": "Pintura e gesso",       "status": "Ativo",   "notes": "Especialista em texturas e efeitos especiais." },
+    { "id": 6, "name": "Roberto Lima",     "phone": "(11) 93210-9988", "specialty": "Marcenaria",            "status": "Inativo", "notes": "Fora do mercado temporariamente." }
+  ]
+}

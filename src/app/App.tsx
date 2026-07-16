@@ -468,8 +468,6 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
 
 // ─── Screen B: Project Detail ─────────────────────────────────────────────────
 
-type DetailTab = "visao" | "etapas" | "despesas" | "galeria" | "cronograma";
-
 const STEP_STATUS_CONFIG: Record<StepStatus, { label: string; color: string; dot: string }> = {
   "Concluído":    { label: "Concluído",    color: "bg-green-100 text-green-700 border-green-200",          dot: "bg-green-500" },
   "Em andamento": { label: "Em andamento", color: "bg-primary/20 text-primary border-primary/30",           dot: "bg-primary" },
