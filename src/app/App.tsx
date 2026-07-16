@@ -938,9 +938,9 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
           {/* Datas — início e prazo, lado a lado */}
           <div className={isNew ? "grid grid-cols-2 gap-3" : "space-y-2"}>
             {isNew && (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground block flex items-center gap-1.5">
-                  <CalendarDays size={11} className="text-accent" /> Data de início
+                  <CalendarDays size={11} className="text-accent" /> Data de início <span className="text-accent">*</span>
                 </label>
                 <input
                   type="date"
@@ -948,6 +948,9 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
                   onChange={e => setDraft({ ...draft, startDate: e.target.value })}
                   className="w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
                 />
+                <p className="text-[10px] text-muted-foreground/70 leading-tight">
+                  Previsão — usada no cronograma e pode ser ajustada depois.
+                </p>
               </div>
             )}
 
@@ -1344,7 +1347,7 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
           </button>
           <button
             type="button"
-            disabled={!draft.label.trim()}
+            disabled={!draft.label.trim() || (isNew && !draft.startDate)}
             onClick={() => { onSave(draft); onClose(); }}
             className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/80 transition-colors disabled:opacity-40 disabled:pointer-events-none"
           >
