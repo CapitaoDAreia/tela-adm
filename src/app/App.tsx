@@ -170,7 +170,10 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
   const visiblePayments = showAllPayments ? pendingPayments : pendingPayments.slice(0, 2);
 
   const now = new Date();
-  const monthLabel = now.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const monthLabel = (() => {
+    const raw = now.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase().replace(/(\d)/, m => m);
+  })();
 
   const indCard = (
     id: DashFilter,
@@ -215,7 +218,7 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
           </div>
         </div>
         <div className="text-right">
-          <p className="text-xs text-primary-foreground/60 capitalize">{monthLabel}</p>
+          <p className="text-xs text-primary-foreground/60">{monthLabel}</p>
           <p className="text-sm font-medium">Painel</p>
         </div>
       </header>
@@ -371,7 +374,8 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
             {filteredProjects.length === 0 ? (
               <p className="text-center py-10 text-sm text-muted-foreground">Nenhuma obra neste filtro</p>
             ) : filteredProjects.map(project => {
-              const hasOverdue = project.milestones.some(m =>
+              const isActiveProject = project.status === "Em andamento" || project.status === "Pausado";
+              const hasOverdue = isActiveProject && project.milestones.some(m =>
                 m.deadline && m.status !== "Concluído" && m.status !== "Cancelado" && parseDeadline(m.deadline) < today
               );
               const hasPendingPayment = project.expenses.some(e => e.isPayment && e.paymentStatus === "A fazer");
@@ -780,27 +784,33 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
                 <PackagePlus size={13} className="text-muted-foreground" />
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Materiais</span>
               </div>
-              {draft.startDate && parseAnyDate(draft.startDate) && (
-                <span className="text-[10px] text-amber-500 font-medium">
-                  Pedir até {(() => {
-                    const d = parseAnyDate(draft.startDate!)!;
-                    d.setDate(d.getDate() - 2);
-                    return d.toLocaleDateString("pt-BR");
-                  })()}
-                </span>
-              )}
+              {draft.startDate && (() => {
+                const d = parseAnyDate(draft.startDate!);
+                if (!d) return null;
+                const orderBy = new Date(d);
+                orderBy.setDate(d.getDate() - 2);
+                const now = new Date(); now.setHours(0,0,0,0);
+                if (orderBy < now) return null;
+                return (
+                  <span className="text-[10px] text-amber-500 font-medium">
+                    Pedir até {orderBy.toLocaleDateString("pt-BR")}
+                  </span>
+                );
+              })()}
             </div>
             <div className="px-4 py-3 space-y-2">
               {(draft.materials ?? []).map((mat, i) => (
                 <div key={mat.id} className="space-y-1.5">
                   <div className="flex items-center gap-2">
-                    {/* Status chip clicável */}
+                    <span className="text-sm text-foreground flex-1 min-w-0">{mat.description}</span>
+                    {/* Status chips — clicável, à direita */}
+                    <div className="flex items-center gap-1 shrink-0">
                     {(["Pendente","Pedido","Recebido"] as const).map(s => (
                       <button
                         key={s}
                         type="button"
                         onClick={() => s !== mat.status && setPendingMatChange({ id: mat.id, newStatus: s })}
-                        className={`text-[10px] px-2 py-0.5 rounded border transition-colors shrink-0 ${
+                        className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
                           mat.status === s
                             ? s === "Recebido" ? "bg-emerald-900/30 text-emerald-400 border-emerald-800/40 font-semibold"
                             : s === "Pedido"   ? "bg-blue-900/30 text-blue-400 border-blue-800/40 font-semibold"
@@ -809,7 +819,7 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
                         }`}
                       >{s}</button>
                     ))}
-                    <span className="text-sm text-foreground flex-1">{mat.description}</span>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setDraft({ ...draft, materials: (draft.materials ?? []).filter((_, j) => j !== i) })}
@@ -1213,7 +1223,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-border bg-card overflow-x-auto scrollbar-hide">
+      <div className="flex border-b border-border bg-card overflow-x-auto" style={{ scrollbarWidth: "none" } as React.CSSProperties}>
         {([
           { id: "visao",       label: "Visão Geral",  icon: <LayoutDashboard size={14} /> },
           { id: "etapas",      label: "Etapas",       icon: <ListChecks size={14} /> },
@@ -1224,7 +1234,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-colors border-b-2 ${
+            className={`flex-none flex items-center justify-center gap-1.5 px-4 py-3 text-xs font-medium whitespace-nowrap transition-colors border-b-2 ${
               tab === t.id
                 ? "border-accent text-accent"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -1421,7 +1431,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                       {m.label}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded border ${cfg.color}`}>{cfg.label}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border whitespace-nowrap ${cfg.color}`}>{cfg.label}</span>
                       {m.startDate && (
                         <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-0.5">
                           <CalendarDays size={9} /> {fmtDate(m.startDate)}
@@ -1527,68 +1537,68 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                 </span>
               </div>
 
-              {/* Régua de meses — alinhada à coluna das barras */}
-              <div className="flex items-end gap-3">
-                <div className="w-36 shrink-0" />
-                <div className="relative flex-1 h-4">
-                  {monthMarkers.map((mk, i) => (
-                    <span
-                      key={i}
-                      className="absolute text-[9px] text-muted-foreground font-mono whitespace-nowrap"
-                      style={{ left: `${mk.pos}%`, bottom: 0 }}
-                    >{mk.label}</span>
-                  ))}
-                </div>
-                <div className="w-24 shrink-0" />
-              </div>
-
-              {/* Barras das etapas */}
-              <div className="space-y-2.5">
-                {milestones.map((m, i) => {
-                  const start = parseD(m.startDate ?? "");
-                  const end   = parseD(m.deadline) ?? start;
-                  if (!start || !end) return null;   // sem data de início: não inferimos, não renderizamos
-                  const left  = pct(start);
-                  const width = Math.max(1.5, pct(end) - left);
-                  const realStart = parseD(m.startedAt ?? "");
-                  const cfg = STEP_STATUS_CONFIG[m.status];
-                  return (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="w-36 shrink-0 text-right">
-                        <span className="text-[11px] text-foreground leading-tight line-clamp-2">{m.label}</span>
-                      </div>
-                      <div className="relative flex-1 h-6">
-                        {/* gridlines dos meses */}
-                        {monthMarkers.map((mk, j) => (
-                          <div key={j} className="absolute inset-y-0 w-px bg-border/60" style={{ left: `${mk.pos}%` }} />
-                        ))}
-                        {/* trilho */}
-                        <div className="absolute inset-y-0 left-0 right-0 rounded-full bg-muted/40" />
-                        {/* barra (início previsto → prazo) */}
-                        <div
-                          className={`absolute inset-y-1 rounded-full ${STATUS_COLORS[m.status]} transition-all`}
-                          style={{ left: `${left}%`, width: `${width}%` }}
-                          title={`Previsto: ${fmtDate(m.startDate ?? "")} → ${fmtDate(m.deadline)}`}
-                        />
-                        {/* marcador de início real */}
-                        {realStart && (
-                          <div
-                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-2 rotate-45 bg-blue-500 border border-white/70 z-20"
-                            style={{ left: `${pct(realStart)}%` }}
-                            title={`Início real: ${fmtDate(m.startedAt ?? "")}`}
-                          />
-                        )}
-                        {/* linha hoje */}
-                        {todayPct >= 0 && todayPct <= 100 && (
-                          <div className="absolute inset-y-0 w-0.5 bg-red-500 z-10" style={{ left: `${todayPct}%` }} />
-                        )}
-                      </div>
-                      <div className="w-24 shrink-0">
-                        <span className={`inline-block whitespace-nowrap text-[9px] px-1.5 py-0.5 rounded border ${cfg.color}`}>{cfg.label}</span>
-                      </div>
+              {/* Gantt: scrollável horizontalmente em telas pequenas */}
+              <div className="overflow-x-auto -mx-4 px-4" style={{ scrollbarWidth: "thin" } as React.CSSProperties}>
+                <div style={{ minWidth: 520 }}>
+                  {/* Régua de meses — alinhada à coluna das barras */}
+                  <div className="flex items-end gap-3">
+                    <div className="w-36 shrink-0" />
+                    <div className="relative flex-1 h-4">
+                      {monthMarkers.map((mk, i) => (
+                        <span
+                          key={i}
+                          className="absolute text-[9px] text-muted-foreground font-mono whitespace-nowrap"
+                          style={{ left: `${mk.pos}%`, bottom: 0 }}
+                        >{mk.label}</span>
+                      ))}
                     </div>
-                  );
-                })}
+                    <div className="w-24 shrink-0" />
+                  </div>
+
+                  {/* Barras das etapas */}
+                  <div className="space-y-2.5 mt-2">
+                    {milestones.map((m, i) => {
+                      const start = parseD(m.startDate ?? "");
+                      const end   = parseD(m.deadline) ?? start;
+                      if (!start || !end) return null;
+                      const left  = pct(start);
+                      const width = Math.max(1.5, pct(end) - left);
+                      const realStart = parseD(m.startedAt ?? "");
+                      const cfg = STEP_STATUS_CONFIG[m.status];
+                      return (
+                        <div key={i} className="flex items-center gap-3">
+                          <div className="w-36 shrink-0 text-right">
+                            <span className="text-[11px] text-foreground leading-tight line-clamp-2">{m.label}</span>
+                          </div>
+                          <div className="relative flex-1 h-6">
+                            {monthMarkers.map((mk, j) => (
+                              <div key={j} className="absolute inset-y-0 w-px bg-border/60" style={{ left: `${mk.pos}%` }} />
+                            ))}
+                            <div className="absolute inset-y-0 left-0 right-0 rounded-full bg-muted/40" />
+                            <div
+                              className={`absolute inset-y-1 rounded-full ${STATUS_COLORS[m.status]} transition-all`}
+                              style={{ left: `${left}%`, width: `${width}%` }}
+                              title={`Previsto: ${fmtDate(m.startDate ?? "")} → ${fmtDate(m.deadline)}`}
+                            />
+                            {realStart && (
+                              <div
+                                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-2 rotate-45 bg-blue-500 border border-white/70 z-20"
+                                style={{ left: `${pct(realStart)}%` }}
+                                title={`Início real: ${fmtDate(m.startedAt ?? "")}`}
+                              />
+                            )}
+                            {todayPct >= 0 && todayPct <= 100 && (
+                              <div className="absolute inset-y-0 w-0.5 bg-red-500 z-10" style={{ left: `${todayPct}%` }} />
+                            )}
+                          </div>
+                          <div className="w-24 shrink-0">
+                            <span className={`inline-block whitespace-nowrap text-[9px] px-1.5 py-0.5 rounded border ${cfg.color}`}>{cfg.label}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               {/* Aviso de etapas sem data de início */}
@@ -2560,7 +2570,8 @@ function QuotesList({ quotes, onOpenQuote }: { quotes: QuoteRecord[]; onOpenQuot
 
       {/* Filter bar */}
       <div className="bg-card border-b border-border px-4 py-3 flex items-center gap-2">
-        <div className="flex gap-1.5 flex-1 overflow-x-auto no-scrollbar">
+        <div className="relative flex-1 min-w-0">
+          <div className="flex gap-1.5 overflow-x-auto" style={{ scrollbarWidth: "none" } as React.CSSProperties}>
           {QUOTE_STATUS_FILTERS.map(s => (
             <button
               key={s}
@@ -2574,6 +2585,9 @@ function QuotesList({ quotes, onOpenQuote }: { quotes: QuoteRecord[]; onOpenQuot
               {s}
             </button>
           ))}
+          </div>
+          {/* fade direito — indica que há mais filtros */}
+          <div className="pointer-events-none absolute right-0 inset-y-0 w-8 bg-gradient-to-l from-card to-transparent" />
         </div>
         <select
           value={sortBy}
