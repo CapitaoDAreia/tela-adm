@@ -5,20 +5,16 @@ import {
 import {
   Plus, Building2, TrendingUp, Clock, ArrowLeft, X,
   Camera, FileText, LayoutDashboard, Receipt, Image,
-  CheckCircle, Circle, Upload, Phone, User, DollarSign,
+  CheckCircle, Circle, Upload, Phone, User, DollarSign, Mail,
   HardHat, Wrench, Home, CalendarDays, CalendarCheck, CalendarClock,
   ListChecks, ChevronRight, Trash2, PackagePlus, ClipboardList, FilePlus,
   Printer, ShieldCheck, HardHatIcon, FileBarChart2, Pencil, RotateCcw, CheckCheck, Ban, AlertTriangle
 } from "lucide-react";
 import type {
-  Screen, Project, ProjectStatus, Milestone, StepStatus, Expense, ProjectPhoto,
-  QuoteRecord, QuoteItem, QuoteStatus, Contractor,
+  Screen, Project, ProjectStatus, Milestone, StepStatus, Expense, ProjectPhoto, ProjectDocument,
+  QuoteRecord, QuoteItem, QuoteStatus, Contractor, DetailTab,
 } from "../lib/types";
 import { projectsApi, quotesApi, contractorsApi } from "../lib/api";
-
-// ─── Types (re-exports for components that haven't been extracted yet) ────────
-// DetailTab and DashFilter remain here as they are UI-only types
-type DetailTab = "visao" | "etapas" | "despesas" | "galeria" | "cronograma";
 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -499,9 +495,14 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
 }) {
   const [draft, setDraft] = useState<Milestone>({ ...step });
   const [pickedTemplate, setPickedTemplate] = useState<string | null>(null);
-  const [workerNote, setWorkerNote] = useState("");
   const [pendingStatus, setPendingStatus] = useState<StepStatus | null>(null);
-  const [pendingMatChange, setPendingMatChange] = useState<{ id: number; newStatus: "Pendente" | "Pedido" | "Recebido" } | null>(null);
+  const [availableContractors, setAvailableContractors] = useState<Contractor[]>([]);
+  const [contractorSearch, setContractorSearch] = useState("");
+  const [showContractorDropdown, setShowContractorDropdown] = useState(false);
+
+  useEffect(() => {
+    contractorsApi.list().then(setAvailableContractors).catch(() => {});
+  }, []);
   const [extendingDeadline, setExtendingDeadline] = useState(false);
   const [newDeadline, setNewDeadline] = useState("");
   const [extensionReason, setExtensionReason] = useState("");
@@ -720,27 +721,67 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
               <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Empreiteiro</span>
             </div>
             <div className="px-4 py-3 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground block mb-1.5">Nome</label>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1.5">Selecionar da base</label>
+                <div className="relative">
                   <input
                     type="text"
-                    value={draft.contractorName ?? ""}
-                    onChange={e => setDraft({ ...draft, contractorName: e.target.value })}
-                    placeholder="Ex: João Silva"
+                    value={draft.contractorName
+                      ? (contractorSearch || draft.contractorName)
+                      : contractorSearch}
+                    onChange={e => {
+                      setContractorSearch(e.target.value);
+                      setShowContractorDropdown(true);
+                      if (!e.target.value) {
+                        setDraft({ ...draft, contractorName: undefined, contractorPhone: undefined });
+                      }
+                    }}
+                    onFocus={() => setShowContractorDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowContractorDropdown(false), 150)}
+                    placeholder={availableContractors.length === 0 ? "Nenhum empreiteiro cadastrado" : "Buscar empreiteiro..."}
                     className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50"
                   />
+                  {showContractorDropdown && availableContractors.length > 0 && (() => {
+                    const term = contractorSearch.toLowerCase();
+                    const filtered = availableContractors.filter(c =>
+                      c.status === "Ativo" && (!term || c.name.toLowerCase().includes(term) || c.specialty.toLowerCase().includes(term))
+                    );
+                    if (filtered.length === 0) return null;
+                    return (
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg z-20 max-h-40 overflow-y-auto">
+                        {filtered.map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onMouseDown={() => {
+                              setDraft({ ...draft, contractorName: c.name, contractorPhone: c.phone });
+                              setContractorSearch("");
+                              setShowContractorDropdown(false);
+                            }}
+                            className="w-full text-left px-3 py-2.5 hover:bg-accent/10 transition-colors border-b border-border/50 last:border-0"
+                          >
+                            <p className="text-sm font-medium text-foreground">{c.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{c.specialty} · {c.phone}</p>
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground block mb-1.5">Telefone</label>
-                  <input
-                    type="tel"
-                    value={draft.contractorPhone ?? ""}
-                    onChange={e => setDraft({ ...draft, contractorPhone: e.target.value })}
-                    placeholder="(11) 99999-9999"
-                    className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50"
-                  />
-                </div>
+                {draft.contractorName && draft.contractorPhone && (
+                  <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">{draft.contractorName}</span>
+                    <span>·</span>
+                    <span>{draft.contractorPhone}</span>
+                    <button
+                      type="button"
+                      onClick={() => setDraft({ ...draft, contractorName: undefined, contractorPhone: undefined })}
+                      className="ml-auto text-muted-foreground/60 hover:text-red-400 transition-colors"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -773,191 +814,6 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
                     <option>Concluído</option>
                   </select>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Seção: Materiais ── */}
-          <div className="rounded-xl border border-border bg-muted/40 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/60">
-              <div className="flex items-center gap-2">
-                <PackagePlus size={13} className="text-muted-foreground" />
-                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Materiais</span>
-              </div>
-              {draft.startDate && (() => {
-                const d = parseAnyDate(draft.startDate!);
-                if (!d) return null;
-                const orderBy = new Date(d);
-                orderBy.setDate(d.getDate() - 2);
-                const now = new Date(); now.setHours(0,0,0,0);
-                if (orderBy < now) return null;
-                return (
-                  <span className="text-[10px] text-amber-500 font-medium">
-                    Pedir até {orderBy.toLocaleDateString("pt-BR")}
-                  </span>
-                );
-              })()}
-            </div>
-            <div className="px-4 py-3 space-y-2">
-              {(draft.materials ?? []).map((mat, i) => (
-                <div key={mat.id} className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-foreground flex-1 min-w-0">{mat.description}</span>
-                    {/* Status chips — clicável, à direita */}
-                    <div className="flex items-center gap-1 shrink-0">
-                    {(["Pendente","Pedido","Recebido"] as const).map(s => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => s !== mat.status && setPendingMatChange({ id: mat.id, newStatus: s })}
-                        className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
-                          mat.status === s
-                            ? s === "Recebido" ? "bg-emerald-900/30 text-emerald-400 border-emerald-800/40 font-semibold"
-                            : s === "Pedido"   ? "bg-blue-900/30 text-blue-400 border-blue-800/40 font-semibold"
-                            : "bg-muted text-muted-foreground border-border font-semibold"
-                            : "bg-transparent text-muted-foreground/50 border-border/50 hover:border-muted-foreground hover:text-muted-foreground"
-                        }`}
-                      >{s}</button>
-                    ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setDraft({ ...draft, materials: (draft.materials ?? []).filter((_, j) => j !== i) })}
-                      className="p-1 text-muted-foreground hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                  {/* Confirmação de mudança de status */}
-                  {pendingMatChange?.id === mat.id && (
-                    <div className="ml-1 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 flex items-center justify-between gap-3">
-                      <p className="text-xs text-foreground">
-                        Marcar como <span className="font-semibold">{pendingMatChange.newStatus}</span>?
-                      </p>
-                      <div className="flex gap-2">
-                        <button type="button" onClick={() => setPendingMatChange(null)}
-                          className="text-xs px-2.5 py-1 rounded bg-muted text-muted-foreground hover:bg-secondary transition-colors">
-                          Cancelar
-                        </button>
-                        <button type="button" onClick={() => {
-                          const mats = [...(draft.materials ?? [])];
-                          const idx = mats.findIndex(m => m.id === mat.id);
-                          if (idx >= 0) mats[idx] = { ...mats[idx], status: pendingMatChange.newStatus };
-                          setDraft({ ...draft, materials: mats });
-                          setPendingMatChange(null);
-                        }} className="text-xs px-2.5 py-1 rounded bg-accent text-accent-foreground hover:bg-accent/80 transition-colors">
-                          Confirmar
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-              <div className="flex gap-2 pt-1">
-                <input
-                  type="text"
-                  id="mat-input"
-                  placeholder="Ex: Porcelanato 60×60"
-                  className="flex-1 bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50"
-                  onKeyDown={e => {
-                    if (e.key === "Enter") {
-                      const input = e.currentTarget;
-                      if (!input.value.trim()) return;
-                      const newMat = { id: Date.now(), description: input.value.trim(), status: "Pendente" as const };
-                      setDraft({ ...draft, materials: [...(draft.materials ?? []), newMat] });
-                      input.value = "";
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const input = document.getElementById("mat-input") as HTMLInputElement;
-                    if (!input?.value.trim()) return;
-                    const newMat = { id: Date.now(), description: input.value.trim(), status: "Pendente" as const };
-                    setDraft({ ...draft, materials: [...(draft.materials ?? []), newMat] });
-                    input.value = "";
-                  }}
-                  className="px-3 py-2 bg-accent text-accent-foreground rounded-lg text-xs font-medium hover:bg-accent/80 transition-colors flex items-center gap-1"
-                >
-                  <Plus size={12} /> Add
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Seção: Execução (trabalhador) ── */}
-          <div className="rounded-xl border border-border bg-muted/40 overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/60">
-              <HardHat size={13} className="text-muted-foreground" />
-              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Registro da execução</span>
-            </div>
-            <div className="px-4 py-3 space-y-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1.5">Nota de progresso</label>
-                <textarea
-                  rows={2}
-                  value={workerNote}
-                  onChange={e => setWorkerNote(e.target.value)}
-                  placeholder="Descreva o que foi feito, materiais usados, observações..."
-                  className="w-full bg-input-background rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50 resize-none"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1.5 flex items-center gap-1.5">
-                  <Camera size={11} className="text-accent" />
-                  Evidências fotográficas
-                  {draft.photos.length === 0 && draft.status === "Concluído" && (
-                    <span className="text-[10px] text-amber-500 font-normal">(recomendado para concluir)</span>
-                  )}
-                </label>
-                {draft.photos.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2 mb-2">
-                    {draft.photos.map((url, i) => (
-                      <div key={i} className="relative rounded-lg overflow-hidden aspect-square bg-muted">
-                        <img src={url} alt="" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setDraft({ ...draft, photos: draft.photos.filter((_, j) => j !== i) })}
-                          className="absolute top-1 right-1 bg-black/60 rounded-full p-0.5 text-white hover:bg-black/80 transition-colors"
-                        >
-                          <X size={10} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <input
-                  type="file"
-                  id="step-photos-input"
-                  multiple
-                  accept="image/*"
-                  className="hidden"
-                  onChange={e => {
-                    const files = Array.from(e.target.files || []);
-                    const newUrls: string[] = [];
-                    let loaded = 0;
-                    files.forEach(file => {
-                      const reader = new FileReader();
-                      reader.onload = ev => {
-                        newUrls.push(ev.target?.result as string);
-                        loaded++;
-                        if (loaded === files.length) {
-                          setDraft(d => ({ ...d, photos: [...d.photos, ...newUrls] }));
-                        }
-                      };
-                      reader.readAsDataURL(file);
-                    });
-                    e.target.value = "";
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => document.getElementById("step-photos-input")?.click()}
-                  className="w-full py-2.5 border border-dashed border-border rounded-lg text-xs text-muted-foreground hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2"
-                >
-                  <Upload size={13} /> Anexar fotos / vídeos
-                </button>
               </div>
             </div>
           </div>
@@ -1043,6 +899,165 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
   );
 }
 
+// ─── Documentos Tab ──────────────────────────────────────────────────────────
+
+function DocumentosTab({
+  documents,
+  onAdd,
+  onRemove,
+}: {
+  documents: ProjectDocument[];
+  onAdd: (doc: ProjectDocument) => void;
+  onRemove: (id: number) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [docTitle, setDocTitle] = useState("");
+  const [docDescription, setDocDescription] = useState("");
+  const [docFile, setDocFile] = useState<File | null>(null);
+
+  const nowStr = () => {
+    const now = new Date();
+    return `${String(now.getDate()).padStart(2,"0")}/${String(now.getMonth()+1).padStart(2,"0")}/${now.getFullYear()}`;
+  };
+
+  const handleAdd = () => {
+    if (!docTitle.trim() || !docFile) return;
+    const url = URL.createObjectURL(docFile);
+    onAdd({
+      id: Date.now(),
+      title: docTitle.trim(),
+      description: docDescription.trim(),
+      url,
+      fileName: docFile.name,
+      uploadedAt: nowStr(),
+    });
+    setDocTitle("");
+    setDocDescription("");
+    setDocFile(null);
+    setUploading(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      {documents.length === 0 && !uploading && (
+        <div className="bg-card border border-border rounded-xl p-10 flex flex-col items-center gap-3 text-center">
+          <FileText size={32} className="text-muted-foreground/40" />
+          <p className="text-sm text-muted-foreground">Nenhum documento adicionado ainda</p>
+        </div>
+      )}
+
+      {documents.length > 0 && (
+        <div className="space-y-2">
+          {documents.map(doc => (
+            <div key={doc.id} className="bg-card border border-border rounded-xl p-4 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
+                <FileText size={16} className="text-red-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground leading-snug">{doc.title}</p>
+                {doc.description && <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{doc.description}</p>}
+                <p className="text-[10px] text-muted-foreground/60 font-mono mt-1">{doc.fileName} · {doc.uploadedAt}</p>
+              </div>
+              <div className="flex gap-1.5 shrink-0">
+                <a
+                  href={doc.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1.5 rounded hover:bg-accent/10 text-muted-foreground hover:text-accent transition-colors"
+                  title="Abrir"
+                >
+                  <Upload size={13} className="rotate-180" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => onRemove(doc.id)}
+                  className="p-1.5 rounded hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors"
+                  title="Remover"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {uploading ? (
+        <div className="bg-card border border-accent/30 rounded-xl p-4 space-y-3">
+          <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Novo documento</p>
+          <input
+            type="text"
+            placeholder="Título do documento"
+            value={docTitle}
+            onChange={e => setDocTitle(e.target.value)}
+            className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50"
+          />
+          <input
+            type="text"
+            placeholder="Descrição (opcional)"
+            value={docDescription}
+            onChange={e => setDocDescription(e.target.value)}
+            className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50"
+          />
+          <div>
+            <input
+              type="file"
+              id="doc-upload-input"
+              accept=".pdf"
+              className="hidden"
+              onChange={e => setDocFile(e.target.files?.[0] ?? null)}
+            />
+            {docFile ? (
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg text-sm">
+                <FileText size={14} className="text-red-500 shrink-0" />
+                <span className="text-foreground flex-1 min-w-0 truncate">{docFile.name}</span>
+                <button type="button" onClick={() => setDocFile(null)} className="text-muted-foreground hover:text-red-400 transition-colors">
+                  <X size={13} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => document.getElementById("doc-upload-input")?.click()}
+                className="w-full py-2.5 border border-dashed border-border rounded-lg text-xs text-muted-foreground hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2"
+              >
+                <Upload size={13} /> Selecionar arquivo PDF
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => { setUploading(false); setDocTitle(""); setDocDescription(""); setDocFile(null); }}
+              className="flex-1 py-2 bg-muted text-muted-foreground rounded-lg text-xs font-medium hover:bg-secondary transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={!docTitle.trim() || !docFile}
+              className="flex-1 py-2 bg-accent text-accent-foreground rounded-lg text-xs font-medium hover:bg-amber-600 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            >
+              Adicionar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setUploading(true)}
+          className="w-full py-3 border-2 border-dashed border-border rounded-xl text-sm text-muted-foreground hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2"
+        >
+          <FilePlus size={16} /> Adicionar Documento
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Project Detail ───────────────────────────────────────────────────────────
+
 function ProjectDetail({ project, onBack, onUpdateProject }: {
   project: Project;
   onBack: () => void;
@@ -1053,6 +1068,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
   const [milestones, setMilestones] = useState<Milestone[]>(project.milestones);
   const [expenses, setExpenses] = useState<Expense[]>(project.expenses);
   const [photos, setPhotos] = useState(project.photos);
+  const [documents, setDocuments] = useState<ProjectDocument[]>(project.documents ?? []);
   const [lightboxPhoto, setLightboxPhoto] = useState<{ url: string; caption: string; date: string } | null>(null);
 
   const computedProgress = milestones.length > 0
@@ -1230,6 +1246,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
           { id: "cronograma",  label: "Cronograma",   icon: <CalendarDays size={14} /> },
           { id: "despesas",    label: "Despesas",      icon: <Receipt size={14} /> },
           { id: "galeria",     label: "Galeria",       icon: <Image size={14} /> },
+          { id: "documentos",  label: "Documentos",   icon: <FileText size={14} /> },
         ] as { id: DetailTab; label: string; icon: React.ReactNode }[]).map(t => (
           <button
             key={t.id}
@@ -1556,7 +1573,18 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                   </div>
 
                   {/* Barras das etapas */}
-                  <div className="space-y-2.5 mt-2">
+                  <div className="relative mt-2 pt-4">
+                    {/* Linha "Hoje" spanning todas as linhas — left = 9.75rem + todayPct% of bars area (100% - 16.5rem) */}
+                    {todayPct >= 0 && todayPct <= 100 && (
+                      <div
+                        className="absolute top-0 bottom-0 z-20 pointer-events-none"
+                        style={{ left: `calc(${(9.75 - todayPct * 16.5 / 100).toFixed(4)}rem + ${todayPct}%)` }}
+                      >
+                        <div className="w-0.5 h-full bg-red-500 opacity-80" />
+                        <span className="absolute top-0 -translate-x-1/2 text-[9px] font-semibold text-red-500 bg-background/90 px-1 rounded whitespace-nowrap leading-none py-0.5">Hoje</span>
+                      </div>
+                    )}
+                    <div className="space-y-2.5">
                     {milestones.map((m, i) => {
                       const start = parseD(m.startDate ?? "");
                       const end   = parseD(m.deadline) ?? start;
@@ -1587,9 +1615,6 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                                 title={`Início real: ${fmtDate(m.startedAt ?? "")}`}
                               />
                             )}
-                            {todayPct >= 0 && todayPct <= 100 && (
-                              <div className="absolute inset-y-0 w-0.5 bg-red-500 z-10" style={{ left: `${todayPct}%` }} />
-                            )}
                           </div>
                           <div className="w-24 shrink-0">
                             <span className={`inline-block whitespace-nowrap text-[9px] px-1.5 py-0.5 rounded border ${cfg.color}`}>{cfg.label}</span>
@@ -1597,6 +1622,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                         </div>
                       );
                     })}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1749,6 +1775,23 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
               <Upload size={16} /> Adicionar Fotos
             </button>
           </div>
+        )}
+
+        {/* TAB: Documentos */}
+        {tab === "documentos" && (
+          <DocumentosTab
+            documents={documents}
+            onAdd={doc => {
+              const next = [...documents, doc];
+              setDocuments(next);
+              onUpdateProject?.({ ...project, milestones, expenses, photos, status, progress: computedProgress, phase: computedPhase, documents: next });
+            }}
+            onRemove={id => {
+              const next = documents.filter(d => d.id !== id);
+              setDocuments(next);
+              onUpdateProject?.({ ...project, milestones, expenses, photos, status, progress: computedProgress, phase: computedPhase, documents: next });
+            }}
+          />
         )}
       </div>
 
@@ -2093,7 +2136,8 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
     phone: "",
     description: "",
     contractValue: "",
-    urgency: "Normal",
+    email: "",
+    urgency: "Padrão",
     startDate: "",
     endDate: "",
   });
@@ -2108,6 +2152,14 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.clientName.trim()) {
+      setDateError("O nome do cliente é obrigatório.");
+      return;
+    }
+    if (!form.email.trim() && !form.phone.trim()) {
+      setDateError("Informe pelo menos um contato: e-mail ou telefone.");
+      return;
+    }
     if (form.startDate && form.endDate && form.startDate >= form.endDate) {
       setDateError("A data de início deve ser anterior à entrega prevista.");
       return;
@@ -2128,6 +2180,7 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
       id: Date.now(),
       clientName: form.clientName,
       phone: form.phone,
+      email: form.email || undefined,
       description: form.description,
       items,
       budgeted: totalValue,
@@ -2221,7 +2274,7 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
               <h2>Escopo do serviço</h2>
               <table><tbody>${itemsHtml}</tbody></table>
               <div class="total">
-                <span class="total-label">Valor total do contrato</span>
+                <span class="total-label">Valor total do projeto</span>
                 <span class="total-value">${contractVal > 0 ? contractVal.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }) : "—"}</span>
               </div>
               <h2>Datas previstas</h2>
@@ -2274,17 +2327,32 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
               />
             </div>
           </div>
-          <div>
-            <label className="text-xs font-medium text-foreground block mb-1.5">Telefone / WhatsApp</label>
-            <div className="relative">
-              <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="tel"
-                placeholder="(11) 99999-0000"
-                value={form.phone}
-                onChange={e => setForm({ ...form, phone: e.target.value })}
-                className="w-full bg-input-background rounded-lg pl-9 pr-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border placeholder:text-muted-foreground/50"
-              />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-foreground block mb-1.5">Telefone / WhatsApp <span className="text-muted-foreground font-normal">(ou e-mail)</span></label>
+              <div className="relative">
+                <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="tel"
+                  placeholder="(11) 99999-0000"
+                  value={form.phone}
+                  onChange={e => setForm({ ...form, phone: e.target.value })}
+                  className="w-full bg-input-background rounded-lg pl-9 pr-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border placeholder:text-muted-foreground/50"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-foreground block mb-1.5">E-mail <span className="text-muted-foreground font-normal">(ou telefone)</span></label>
+              <div className="relative">
+                <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="email"
+                  placeholder="cliente@email.com"
+                  value={form.email}
+                  onChange={e => setForm({ ...form, email: e.target.value })}
+                  className="w-full bg-input-background rounded-lg pl-9 pr-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border placeholder:text-muted-foreground/50"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -2453,8 +2521,8 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
           </div>
           <div>
             <label className="text-xs font-medium text-foreground block mb-1.5">Urgência</label>
-            <div className="grid grid-cols-3 gap-2">
-              {["Urgente", "Normal", "Planejado"].map(u => (
+            <div className="grid grid-cols-2 gap-2">
+              {["Urgente", "Padrão"].map(u => (
                 <button
                   key={u} type="button"
                   onClick={() => setForm({ ...form, urgency: u })}
@@ -2525,9 +2593,9 @@ const quoteStatusColors: Record<QuoteStatus, string> = {
 };
 
 const urgencyColors: Record<string, string> = {
-  "Urgente":   "bg-red-50 text-red-600",
-  "Normal":    "bg-gray-100 text-gray-600",
-  "Planejado": "bg-sky-50 text-sky-600",
+  "Urgente": "bg-red-50 text-red-600",
+  "Padrão":  "bg-gray-100 text-gray-600",
+  "Normal":  "bg-gray-100 text-gray-600",
 };
 
 const QUOTE_STATUS_FILTERS = ["Todos", "Solicitado", "Em análise", "Aprovado", "Cancelado"] as const;
@@ -2665,10 +2733,11 @@ function QuoteDetail({
   onUpdateQuote: (q: QuoteRecord) => void;
   onGenerateProject: (q: QuoteRecord) => void;
 }) {
-  const margin = quote.contractValue > 0
-    ? ((quote.contractValue - quote.budgeted) / quote.contractValue) * 100
-    : 0;
-
+  const [localContractValue, setLocalContractValue] = useState(
+    quote.contractValue > 0
+      ? new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(quote.contractValue)
+      : ""
+  );
   const [cancellingQuote, setCancellingQuote] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
@@ -2678,10 +2747,27 @@ function QuoteDetail({
 
   const isReadOnly = quote.status === "Aprovado" || quote.status === "Cancelado";
 
+  const currentBudgeted = quote.items.reduce((s, i) => s + (parseFloat(i.amount.replace(/\./g, "").replace(",", ".")) || 0), 0);
+  const currentContractValue = parseFloat(localContractValue.replace(/\./g, "").replace(",", ".")) || quote.contractValue;
+  const margin = currentContractValue > 0
+    ? ((currentContractValue - currentBudgeted) / currentContractValue) * 100
+    : 0;
+
+  const saveContractValue = () => {
+    const val = parseFloat(localContractValue.replace(/\./g, "").replace(",", ".")) || 0;
+    if (val !== quote.contractValue) {
+      onUpdateQuote(addHistory({ ...quote, contractValue: val }, `Valor do contrato atualizado para ${fmt(val)}.`));
+    }
+  };
+
+  const recalcBudgeted = (items: QuoteItem[]) =>
+    items.reduce((s, i) => s + (parseFloat(i.amount.replace(/\./g, "").replace(",", ".")) || 0), 0);
+
   const saveItemEdit = () => {
     if (!editItemDraft) return;
+    const newItems = quote.items.map(i => i.id === editItemDraft.id ? editItemDraft : i);
     const updated = addHistory(
-      { ...quote, items: quote.items.map(i => i.id === editItemDraft.id ? editItemDraft : i) },
+      { ...quote, items: newItems, budgeted: recalcBudgeted(newItems) },
       `Item "${editItemDraft.title}" editado.`
     );
     onUpdateQuote(updated);
@@ -2691,8 +2777,9 @@ function QuoteDetail({
 
   const removeItem = (id: number) => {
     const item = quote.items.find(i => i.id === id);
+    const newItems = quote.items.filter(i => i.id !== id);
     const updated = addHistory(
-      { ...quote, items: quote.items.filter(i => i.id !== id) },
+      { ...quote, items: newItems, budgeted: recalcBudgeted(newItems) },
       `Item "${item?.title ?? id}" removido.`
     );
     onUpdateQuote(updated);
@@ -2701,8 +2788,9 @@ function QuoteDetail({
   const addQuoteItem = () => {
     if (!newQuoteItem.title.trim() || !newQuoteItem.amount.trim()) return;
     const newId = Math.max(0, ...quote.items.map(i => i.id)) + 1;
+    const newItems = [...quote.items, { ...newQuoteItem, id: newId }];
     const updated = addHistory(
-      { ...quote, items: [...quote.items, { ...newQuoteItem, id: newId }] },
+      { ...quote, items: newItems, budgeted: recalcBudgeted(newItems) },
       `Item "${newQuoteItem.title}" adicionado.`
     );
     onUpdateQuote(updated);
@@ -2771,15 +2859,30 @@ function QuoteDetail({
       <div className="bg-primary/90 text-primary-foreground px-5 py-3 grid grid-cols-4 gap-1 text-sm border-t border-primary-foreground/10">
         <div>
           <p className="text-[10px] text-primary-foreground/60 font-mono">Custo orçado</p>
-          <p className="font-semibold font-mono text-sm">{fmt(quote.budgeted)}</p>
+          <p className="font-semibold font-mono text-sm">{fmt(currentBudgeted)}</p>
         </div>
         <div>
           <p className="text-[10px] text-primary-foreground/60 font-mono">Contrato</p>
-          <p className="font-semibold font-mono text-sm text-amber-400">{fmt(quote.contractValue)}</p>
+          {!isReadOnly ? (
+            <input
+              type="text"
+              inputMode="numeric"
+              value={localContractValue}
+              onChange={e => {
+                const raw = e.target.value.replace(/\D/g, "");
+                setLocalContractValue(raw ? new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(parseInt(raw, 10)) : "");
+              }}
+              onBlur={saveContractValue}
+              className="font-semibold font-mono text-sm text-amber-400 bg-transparent border-b border-amber-400/50 outline-none w-full min-w-0"
+              placeholder="R$"
+            />
+          ) : (
+            <p className="font-semibold font-mono text-sm text-amber-400">{fmt(quote.contractValue)}</p>
+          )}
         </div>
         <div>
           <p className="text-[10px] text-primary-foreground/60 font-mono">Margem</p>
-          <p className="font-semibold font-mono text-sm text-green-400">{margin.toFixed(1)}%</p>
+          <p className={`font-semibold font-mono text-sm ${margin >= 0 ? "text-green-400" : "text-red-400"}`}>{margin.toFixed(1)}%</p>
         </div>
         <div className="text-right">
           <p className="text-[10px] text-primary-foreground/60 font-mono">Urgência</p>

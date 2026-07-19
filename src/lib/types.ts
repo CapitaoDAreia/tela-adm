@@ -8,7 +8,7 @@ export type Screen =
   | "quoteDetail"
   | "empreiteiros";
 
-export type DetailTab = "visao" | "etapas" | "despesas" | "galeria" | "cronograma";
+export type DetailTab = "visao" | "etapas" | "despesas" | "galeria" | "cronograma" | "documentos";
 
 // ─── Contractors ──────────────────────────────────────────────────────────────
 
@@ -41,6 +41,7 @@ export interface QuoteRecord {
   id: number;
   clientName: string;
   phone: string;
+  email?: string;
   description: string;
   items: QuoteItem[];
   budgeted: number;
@@ -116,6 +117,15 @@ export interface ProjectPhoto {
   date: string;
 }
 
+export interface ProjectDocument {
+  id: number;
+  title: string;
+  description: string;
+  url: string;
+  fileName: string;
+  uploadedAt: string;
+}
+
 export interface Project {
   id: number;
   name: string;
@@ -134,6 +144,7 @@ export interface Project {
   expenses: Expense[];
   milestones: Milestone[];
   photos: ProjectPhoto[];
+  documents?: ProjectDocument[];
   history?: ProjectHistoryEntry[];
   cancelReason?: string;
 }
