@@ -783,36 +783,21 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
                   </div>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground block mb-1.5">Valor combinado</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={draft.contractorValue != null ? new Intl.NumberFormat("pt-BR").format(draft.contractorValue) : ""}
-                      onChange={e => {
-                        const raw = e.target.value.replace(/\D/g, "");
-                        setDraft({ ...draft, contractorValue: raw ? parseInt(raw, 10) : undefined });
-                      }}
-                      placeholder="0"
-                      className="w-full bg-input-background rounded-lg pl-8 pr-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground block mb-1.5">Status</label>
-                  <select
-                    value={draft.contractorStatus ?? "Não contratado"}
-                    onChange={e => setDraft({ ...draft, contractorStatus: e.target.value as Milestone["contractorStatus"] })}
-                    className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground"
-                  >
-                    <option>Não contratado</option>
-                    <option>Contratado</option>
-                    <option>Em execução</option>
-                    <option>Concluído</option>
-                  </select>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1.5">Valor combinado</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={draft.contractorValue != null ? new Intl.NumberFormat("pt-BR").format(draft.contractorValue) : ""}
+                    onChange={e => {
+                      const raw = e.target.value.replace(/\D/g, "");
+                      setDraft({ ...draft, contractorValue: raw ? parseInt(raw, 10) : undefined });
+                    }}
+                    placeholder="0"
+                    className="w-full bg-input-background rounded-lg pl-8 pr-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground placeholder:text-muted-foreground/50"
+                  />
                 </div>
               </div>
             </div>
@@ -2160,6 +2145,10 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
       setDateError("Informe pelo menos um contato: e-mail ou telefone.");
       return;
     }
+    if (!form.contractValue.trim()) {
+      setDateError("O valor do contrato é obrigatório.");
+      return;
+    }
     if (form.startDate && form.endDate && form.startDate >= form.endDate) {
       setDateError("A data de início deve ser anterior à entrega prevista.");
       return;
@@ -2274,7 +2263,10 @@ function NewQuote({ onBack, onQuoteCreated }: { onBack: () => void; onQuoteCreat
               <h2>Escopo do serviço</h2>
               <table><tbody>${itemsHtml}</tbody></table>
               <div class="total">
-                <span class="total-label">Valor total do projeto</span>
+                <div>
+                  <span class="total-label">Valor total do projeto</span>
+                  <div style="font-size:10px;color:#aaa;margin-top:3px">Inclui taxas administrativas, BDI e margem operacional</div>
+                </div>
                 <span class="total-value">${contractVal > 0 ? contractVal.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }) : "—"}</span>
               </div>
               <h2>Datas previstas</h2>
@@ -2745,7 +2737,7 @@ function QuoteDetail({
   const [addingQuoteItem, setAddingQuoteItem] = useState(false);
   const [newQuoteItem, setNewQuoteItem] = useState<Omit<QuoteItem, "id">>({ title: "", description: "", amount: "" });
 
-  const isReadOnly = quote.status === "Aprovado" || quote.status === "Cancelado";
+  const isReadOnly = quote.status !== "Em análise";
 
   const currentBudgeted = quote.items.reduce((s, i) => s + (parseFloat(i.amount.replace(/\./g, "").replace(",", ".")) || 0), 0);
   const currentContractValue = parseFloat(localContractValue.replace(/\./g, "").replace(",", ".")) || quote.contractValue;
