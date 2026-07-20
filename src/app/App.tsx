@@ -508,10 +508,17 @@ function StepModal({ step, onClose, onSave, isNew = false, projectStartDate }: {
   const [newDeadline, setNewDeadline] = useState("");
   const [extensionReason, setExtensionReason] = useState("");
   const [dateError, setDateError] = useState("");
+  const [statusError, setStatusError] = useState("");
 
   const projectStartIso = projectStartDate && projectStartDate !== "–"
     ? projectStartDate.split("/").reverse().join("-")
     : null;
+
+  const toIso = (d: string) => {
+    if (!d) return "";
+    if (d.includes("/")) return d.split("/").reverse().join("-");
+    return d;
+  };
 
   const formatDeadline = (d: string) => {
     if (!d) return "Não definido";
@@ -534,12 +541,25 @@ function StepModal({ step, onClose, onSave, isNew = false, projectStartDate }: {
   const confirmStatus = () => {
     if (!pendingStatus) return;
     const today = new Date().toISOString().split("T")[0];
+
+    if (pendingStatus === "Em andamento") {
+      const startIso = toIso(draft.startDate ?? "");
+      if (startIso && today < startIso) {
+        setStatusError(`Início previsto é ${fmtDate(startIso)} — ainda não chegou essa data.`);
+        return;
+      }
+      if (projectStartIso && today < projectStartIso) {
+        setStatusError(`A obra ainda não foi iniciada (início: ${projectStartDate}).`);
+        return;
+      }
+    }
+
+    setStatusError("");
     setDraft(prev => ({
       ...prev,
       status: pendingStatus,
       done: pendingStatus === "Concluído",
       completedAt: pendingStatus === "Concluído" ? today : "",
-      // início real: registra na primeira vez que vira "Em andamento" e preserva depois
       startedAt: pendingStatus === "Em andamento" ? (prev.startedAt || today) : prev.startedAt,
     }));
     setPendingStatus(null);
@@ -833,10 +853,13 @@ function StepModal({ step, onClose, onSave, isNew = false, projectStartDate }: {
                     <span className={`w-2.5 h-2.5 rounded-full ${STEP_STATUS_CONFIG[pendingStatus].dot}`} />
                     {pendingStatus}
                   </div>
+                  {statusError && (
+                    <p className="text-xs text-red-400 text-center leading-snug">{statusError}</p>
+                  )}
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => setPendingStatus(null)}
+                      onClick={() => { setPendingStatus(null); setStatusError(""); }}
                       className="flex-1 py-2 bg-muted text-muted-foreground rounded-lg text-xs font-medium hover:bg-secondary transition-colors"
                     >
                       Cancelar
@@ -2750,6 +2773,7 @@ function QuoteDetail({
   const [addingQuoteItem, setAddingQuoteItem] = useState(false);
   const [newQuoteItem, setNewQuoteItem] = useState<Omit<QuoteItem, "id">>({ title: "", description: "", amount: "" });
 
+  const [confirmingApproval, setConfirmingApproval] = useState(false);
   const [adjustingValue, setAdjustingValue] = useState(false);
   const [newContractValue, setNewContractValue] = useState("");
   const [contractAdjustReason, setContractAdjustReason] = useState("");
@@ -2972,7 +2996,31 @@ function QuoteDetail({
             {quote.analysisStartedAt && (
               <p className="text-xs text-muted-foreground font-mono">Análise iniciada em {quote.analysisStartedAt}</p>
             )}
-            {cancellingQuote ? (
+            {confirmingApproval ? (
+              <div className={`rounded-xl border p-4 space-y-3 ${margin >= 0 ? "border-green-800/40 bg-green-900/10" : "border-red-800/40 bg-red-900/10"}`}>
+                <p className="text-sm font-medium text-foreground">Confirmar aprovação</p>
+                <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg ${margin >= 0 ? "bg-green-900/20" : "bg-red-900/20"}`}>
+                  <span className={`text-xs font-mono ${margin >= 0 ? "text-green-400" : "text-red-400"}`}>Margem do contrato</span>
+                  <span className={`text-sm font-mono font-bold ${margin >= 0 ? "text-green-400" : "text-red-400"}`}>{margin.toFixed(1)}%</span>
+                </div>
+                {margin < 0 && (
+                  <p className="text-xs text-red-400 leading-snug">Atenção: a margem está negativa. Verifique os valores antes de aprovar.</p>
+                )}
+                <p className="text-sm text-muted-foreground">Deseja aprovar este orçamento?</p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setConfirmingApproval(false)} className="flex-1 py-2.5 bg-muted text-muted-foreground rounded-xl text-sm font-medium hover:bg-secondary transition-colors border border-border">
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { handleApprove(); setConfirmingApproval(false); }}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 ${margin >= 0 ? "bg-green-600 text-white hover:bg-green-700" : "bg-red-600 text-white hover:bg-red-700"}`}
+                  >
+                    <CheckCircle size={15} /> Confirmar aprovação
+                  </button>
+                </div>
+              </div>
+            ) : cancellingQuote ? (
               <div className="rounded-xl border border-red-900/40 bg-red-900/10 p-4 space-y-3">
                 <p className="text-sm font-medium text-foreground">Motivo do cancelamento</p>
                 <textarea
@@ -2992,7 +3040,7 @@ function QuoteDetail({
                 <button type="button" onClick={() => setCancellingQuote(true)} className="flex-1 py-2.5 bg-muted text-muted-foreground rounded-xl text-sm font-medium hover:bg-secondary transition-colors border border-border">
                   Cancelar orçamento
                 </button>
-                <button type="button" onClick={handleApprove} className="flex-1 py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
+                <button type="button" onClick={() => setConfirmingApproval(true)} className="flex-1 py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
                   <CheckCircle size={15} /> Aprovar
                 </button>
               </div>
