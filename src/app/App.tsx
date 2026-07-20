@@ -487,11 +487,12 @@ const PHASE_TEMPLATES: { label: string; description: string }[] = [
   { label: "Acabamentos e entrega",        description: "Instalação de louças, metais, luminárias, rodapés e limpeza fina para entrega." },
 ];
 
-function StepModal({ step, onClose, onSave, isNew = false }: {
+function StepModal({ step, onClose, onSave, isNew = false, projectStartDate }: {
   step: Milestone;
   onClose: () => void;
   onSave: (updated: Milestone) => void;
   isNew?: boolean;
+  projectStartDate?: string;
 }) {
   const [draft, setDraft] = useState<Milestone>({ ...step });
   const [pickedTemplate, setPickedTemplate] = useState<string | null>(null);
@@ -506,6 +507,11 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
   const [extendingDeadline, setExtendingDeadline] = useState(false);
   const [newDeadline, setNewDeadline] = useState("");
   const [extensionReason, setExtensionReason] = useState("");
+  const [dateError, setDateError] = useState("");
+
+  const projectStartIso = projectStartDate && projectStartDate !== "–"
+    ? projectStartDate.split("/").reverse().join("-")
+    : null;
 
   const formatDeadline = (d: string) => {
     if (!d) return "Não definido";
@@ -615,12 +621,20 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
               <input
                 type="date"
                 value={draft.startDate ? (draft.startDate.includes("/") ? draft.startDate.split("/").reverse().join("-") : draft.startDate) : ""}
-                onChange={e => setDraft({ ...draft, startDate: e.target.value })}
-                className="w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+                onChange={e => {
+                  setDraft({ ...draft, startDate: e.target.value });
+                  if (projectStartIso && e.target.value && e.target.value < projectStartIso) {
+                    setDateError(`A data de início não pode ser anterior ao início da obra (${projectStartDate}).`);
+                  } else {
+                    setDateError("");
+                  }
+                }}
+                className={`w-full bg-input-background rounded-lg px-3 py-2.5 text-xs outline-none focus:ring-2 ring-accent/40 border text-foreground font-mono ${dateError ? "border-red-400" : "border-border"}`}
               />
-              <p className="text-[10px] text-muted-foreground/70 leading-tight">
+              {dateError && <p className="text-[10px] text-red-400 leading-tight">{dateError}</p>}
+              {!dateError && <p className="text-[10px] text-muted-foreground/70 leading-tight">
                 Previsão — usada no cronograma e pode ser ajustada depois.
-              </p>
+              </p>}
             </div>
 
           {/* Prazo — definido no planejamento, fora das seções */}
@@ -872,7 +886,7 @@ function StepModal({ step, onClose, onSave, isNew = false }: {
           </button>
           <button
             type="button"
-            disabled={!draft.label.trim() || !draft.startDate}
+            disabled={!draft.label.trim() || !draft.startDate || !!dateError}
             onClick={() => { onSave(draft); onClose(); }}
             className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/80 transition-colors disabled:opacity-40 disabled:pointer-events-none"
           >
@@ -1341,20 +1355,26 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
             {/* Financeiro */}
             {(() => {
               const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+              const effectiveSpent = totalExpenses > 0 ? totalExpenses : project.spent;
               const marginPlanned = project.contractValue - project.budgeted;
-              const marginReal = project.contractValue - totalExpenses;
-              const marginRealPct = totalExpenses > 0
-                ? (marginReal / project.contractValue) * 100
-                : (marginPlanned / project.contractValue) * 100;
-              const isHealthy = marginReal >= marginPlanned * 0.8;
+              const marginReal = project.contractValue - effectiveSpent;
+              const marginPlannedPct = project.contractValue > 0 ? (marginPlanned / project.contractValue) * 100 : 0;
+              const marginRealPct = project.contractValue > 0 ? (marginReal / project.contractValue) * 100 : 0;
 
-              const Row = ({ label, value, highlight }: { label: string; value: string; highlight?: "green" | "red" | "yellow" }) => (
+              const marginStatus = marginRealPct >= 15 ? "healthy" : marginRealPct >= 0 ? "warning" : "critical";
+              const badgeConfig = {
+                healthy: { cls: "bg-green-100 text-green-700 border-green-200", label: "Margem saudável" },
+                warning: { cls: "bg-yellow-100 text-yellow-700 border-yellow-200", label: "Margem em atenção" },
+                critical: { cls: "bg-red-100 text-red-600 border-red-200", label: "Margem negativa" },
+              }[marginStatus];
+
+              const Row = ({ label, value, highlight }: { label: string; value: string; highlight?: "green" | "red" | "yellow" | "neutral" }) => (
                 <div className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
                   <span className="text-sm text-muted-foreground">{label}</span>
                   <span className={`text-sm font-mono font-semibold ${
-                    highlight === "green" ? "text-green-500" :
-                    highlight === "red"   ? "text-red-500" :
-                    highlight === "yellow"? "text-amber-400" :
+                    highlight === "green"  ? "text-green-500" :
+                    highlight === "red"    ? "text-red-500" :
+                    highlight === "yellow" ? "text-amber-400" :
                     "text-foreground"
                   }`}>{value}</span>
                 </div>
@@ -1364,27 +1384,23 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                 <div className="bg-card border border-border rounded-xl p-4">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-xs text-muted-foreground font-mono">Financeiro</p>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${
-                      isHealthy
-                        ? "bg-green-100 text-green-700 border-green-200"
-                        : "bg-red-100 text-red-600 border-red-200"
-                    }`}>
-                      {isHealthy ? "Margem saudável" : "Margem comprimida"}
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${badgeConfig.cls}`}>
+                      {badgeConfig.label}
                     </span>
                   </div>
                   <div className="mt-2">
                     <Row label="Valor do contrato" value={fmt(project.contractValue)} />
                     <Row label="Custo orçado" value={fmt(project.budgeted)} />
-                    <Row label="Custo executado" value={fmt(totalExpenses > 0 ? totalExpenses : project.spent)} />
+                    <Row label="Custo executado" value={fmt(effectiveSpent)} />
                     <Row
                       label="Margem prevista"
-                      value={`${fmt(marginPlanned)} · ${((marginPlanned / project.contractValue) * 100).toFixed(1)}%`}
-                      highlight="yellow"
+                      value={`${fmt(marginPlanned)} · ${marginPlannedPct.toFixed(1)}%`}
+                      highlight={marginPlanned >= 0 ? "neutral" : "red"}
                     />
                     <Row
                       label="Margem real"
                       value={`${fmt(marginReal)} · ${marginRealPct.toFixed(1)}%`}
-                      highlight={marginReal >= 0 ? "green" : "red"}
+                      highlight={marginRealPct >= 15 ? "green" : marginRealPct >= 0 ? "yellow" : "red"}
                     />
                   </div>
                 </div>
@@ -1913,6 +1929,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
         <StepModal
           step={editingStep}
           onClose={() => setEditingStep(null)}
+          projectStartDate={project.startDate}
           onSave={updated => {
             const next = milestones.map(m => m.label === editingStep.label ? updated : m);
             setMilestones(next);
@@ -1927,6 +1944,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
           step={emptyStep}
           isNew
           onClose={() => setCreatingStep(false)}
+          projectStartDate={project.startDate}
           onSave={newStep => {
             const next = [...milestones, newStep];
             setMilestones(next);
@@ -2725,11 +2743,6 @@ function QuoteDetail({
   onUpdateQuote: (q: QuoteRecord) => void;
   onGenerateProject: (q: QuoteRecord) => void;
 }) {
-  const [localContractValue, setLocalContractValue] = useState(
-    quote.contractValue > 0
-      ? new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(quote.contractValue)
-      : ""
-  );
   const [cancellingQuote, setCancellingQuote] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
@@ -2737,20 +2750,29 @@ function QuoteDetail({
   const [addingQuoteItem, setAddingQuoteItem] = useState(false);
   const [newQuoteItem, setNewQuoteItem] = useState<Omit<QuoteItem, "id">>({ title: "", description: "", amount: "" });
 
+  const [adjustingValue, setAdjustingValue] = useState(false);
+  const [newContractValue, setNewContractValue] = useState("");
+  const [contractAdjustReason, setContractAdjustReason] = useState("");
+
+  const [adjustingDates, setAdjustingDates] = useState(false);
+  const [newStartDate, setNewStartDate] = useState(
+    quote.startDate && quote.startDate.includes("/")
+      ? quote.startDate.split("/").reverse().join("-")
+      : quote.startDate || ""
+  );
+  const [newEndDate, setNewEndDate] = useState(
+    quote.endDate && quote.endDate.includes("/")
+      ? quote.endDate.split("/").reverse().join("-")
+      : quote.endDate || ""
+  );
+  const [datesAdjustReason, setDatesAdjustReason] = useState("");
+
   const isReadOnly = quote.status !== "Em análise";
 
   const currentBudgeted = quote.items.reduce((s, i) => s + (parseFloat(i.amount.replace(/\./g, "").replace(",", ".")) || 0), 0);
-  const currentContractValue = parseFloat(localContractValue.replace(/\./g, "").replace(",", ".")) || quote.contractValue;
-  const margin = currentContractValue > 0
-    ? ((currentContractValue - currentBudgeted) / currentContractValue) * 100
+  const margin = quote.contractValue > 0
+    ? ((quote.contractValue - currentBudgeted) / quote.contractValue) * 100
     : 0;
-
-  const saveContractValue = () => {
-    const val = parseFloat(localContractValue.replace(/\./g, "").replace(",", ".")) || 0;
-    if (val !== quote.contractValue) {
-      onUpdateQuote(addHistory({ ...quote, contractValue: val }, `Valor do contrato atualizado para ${fmt(val)}.`));
-    }
-  };
 
   const recalcBudgeted = (items: QuoteItem[]) =>
     items.reduce((s, i) => s + (parseFloat(i.amount.replace(/\./g, "").replace(",", ".")) || 0), 0);
@@ -2840,7 +2862,68 @@ function QuoteDetail({
           <p className="text-xs text-primary-foreground/60 font-mono uppercase tracking-wider">Orçamento</p>
           <h1 className="text-base font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>{quote.clientName}</h1>
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            title="Gerar PDF"
+            onClick={() => {
+              const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+              const itemsHtml = quote.items.map(it => {
+                const amt = parseFloat(String(it.amount).replace(/\./g, "").replace(",", ".")) || 0;
+                return `<tr>
+                  <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0">
+                    <div style="font-size:13px;font-weight:600;color:#1a1a1a">${it.title}</div>
+                    ${it.description ? `<div style="font-size:11px;color:#888;margin-top:2px">${it.description}</div>` : ""}
+                  </td>
+                  <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;text-align:right;white-space:nowrap;font-size:13px;font-weight:600;color:#1a1a1a">${amt > 0 ? fmtBRL(amt) : "—"}</td>
+                </tr>`;
+              }).join("");
+              const now = new Date();
+              const generatedAt = `${String(now.getDate()).padStart(2,"0")}/${String(now.getMonth()+1).padStart(2,"0")}/${now.getFullYear()}`;
+              const win = window.open("", "_blank");
+              if (!win) return;
+              win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+              <title>Orçamento – ${quote.clientName}</title>
+              <style>
+                body{font-family:system-ui,sans-serif;color:#1a1a1a;padding:40px;max-width:680px;margin:0 auto}
+                h1{font-size:26px;margin:0 0 4px;font-weight:700}
+                h2{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#999;margin:28px 0 10px;padding-bottom:6px;border-bottom:1px solid #eee}
+                table{width:100%;border-collapse:collapse}
+                .total{display:flex;justify-content:space-between;align-items:center;padding:12px;background:#fafafa;border-radius:8px;margin-top:8px}
+                .total-label{font-size:13px;color:#555}
+                .total-value{font-size:20px;font-weight:700;color:#D97706}
+                .date-row{display:flex;gap:32px;margin-top:4px}
+                .date-item{font-size:12px;color:#555}
+                .date-item span{display:block;font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+                .status-badge{display:inline-block;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:#fef3c7;color:#92400e;margin-bottom:16px}
+                @media print{body{padding:24px}}
+              </style></head><body>
+              <p style="font-size:10px;color:#aaa;margin:0 0 8px;letter-spacing:.08em;text-transform:uppercase">Orçamento · Gerado em ${generatedAt}</p>
+              <h1>${quote.clientName}</h1>
+              <div class="status-badge">${quote.status}</div>
+              ${quote.description ? `<p style="font-size:13px;color:#666;margin:6px 0 0">${quote.description}</p>` : ""}
+              <h2>Escopo do serviço</h2>
+              <table><tbody>${itemsHtml}</tbody></table>
+              <div class="total">
+                <div>
+                  <span class="total-label">Valor total do projeto</span>
+                  <div style="font-size:10px;color:#aaa;margin-top:3px">Inclui taxas administrativas, BDI e margem operacional</div>
+                </div>
+                <span class="total-value">${quote.contractValue > 0 ? fmtBRL(quote.contractValue) : "—"}</span>
+              </div>
+              <h2>Datas previstas</h2>
+              <div class="date-row">
+                <div class="date-item"><span>Início da obra</span>${quote.startDate || "—"}</div>
+                <div class="date-item"><span>Entrega prevista</span>${quote.endDate || "—"}</div>
+              </div>
+              <script>window.onload=()=>{window.print()}<\/script>
+              </body></html>`);
+              win.document.close();
+            }}
+            className="p-1.5 rounded-lg hover:bg-primary-foreground/10 text-primary-foreground/70 hover:text-primary-foreground transition-colors"
+          >
+            <Printer size={16} />
+          </button>
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${quoteStatusColors[quote.status]}`}>
             {quote.status}
           </span>
@@ -2855,22 +2938,7 @@ function QuoteDetail({
         </div>
         <div>
           <p className="text-[10px] text-primary-foreground/60 font-mono">Contrato</p>
-          {!isReadOnly ? (
-            <input
-              type="text"
-              inputMode="numeric"
-              value={localContractValue}
-              onChange={e => {
-                const raw = e.target.value.replace(/\D/g, "");
-                setLocalContractValue(raw ? new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(parseInt(raw, 10)) : "");
-              }}
-              onBlur={saveContractValue}
-              className="font-semibold font-mono text-sm text-amber-400 bg-transparent border-b border-amber-400/50 outline-none w-full min-w-0"
-              placeholder="R$"
-            />
-          ) : (
-            <p className="font-semibold font-mono text-sm text-amber-400">{fmt(quote.contractValue)}</p>
-          )}
+          <p className="font-semibold font-mono text-sm text-amber-400">{fmt(quote.contractValue)}</p>
         </div>
         <div>
           <p className="text-[10px] text-primary-foreground/60 font-mono">Margem</p>
@@ -2936,6 +3004,197 @@ function QuoteDetail({
           <div className="bg-red-900/10 border border-red-900/30 rounded-xl p-4 space-y-1.5">
             <p className="text-xs text-red-400 font-mono uppercase tracking-wide font-medium">Motivo do cancelamento</p>
             <p className="text-sm text-foreground">{quote.cancellationReason}</p>
+          </div>
+        )}
+
+        {/* Ajustar valor do contrato — só em análise */}
+        {quote.status === "Em análise" && (
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Ajustar valor do contrato</p>
+              {!adjustingValue && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewContractValue(
+                      quote.contractValue > 0
+                        ? new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(quote.contractValue)
+                        : ""
+                    );
+                    setContractAdjustReason("");
+                    setAdjustingValue(true);
+                  }}
+                  className="text-xs text-accent hover:text-amber-600 font-medium transition-colors flex items-center gap-1"
+                >
+                  <Pencil size={12} /> Ajustar
+                </button>
+              )}
+            </div>
+            {!adjustingValue ? (
+              <p className="text-sm font-mono font-semibold text-foreground">{fmt(quote.contractValue)}</p>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1.5">Novo valor do contrato <span className="text-accent">*</span></label>
+                  <div className="relative">
+                    <DollarSign size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={newContractValue}
+                      onChange={e => {
+                        const raw = e.target.value.replace(/\D/g, "");
+                        setNewContractValue(raw ? new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(parseInt(raw, 10)) : "");
+                      }}
+                      placeholder="R$ 0"
+                      className="w-full bg-input-background rounded-lg pl-8 pr-3 py-2.5 text-sm outline-none focus:ring-2 ring-accent/40 border border-border font-mono"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1.5">Motivo do ajuste <span className="text-accent">*</span></label>
+                  <textarea
+                    value={contractAdjustReason}
+                    onChange={e => setContractAdjustReason(e.target.value)}
+                    rows={2}
+                    placeholder="Ex: adição de novo escopo de trabalho..."
+                    className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground resize-none"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setAdjustingValue(false); setNewContractValue(""); setContractAdjustReason(""); }}
+                    className="flex-1 py-2 bg-muted text-muted-foreground rounded-lg text-xs font-medium hover:bg-secondary transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!newContractValue.trim() || !contractAdjustReason.trim()}
+                    onClick={() => {
+                      const val = parseFloat(newContractValue.replace(/\./g, "").replace(",", ".")) || 0;
+                      const reason = contractAdjustReason.trim();
+                      const updated = addHistory(
+                        { ...quote, contractValue: val },
+                        `Valor do contrato ajustado de ${fmt(quote.contractValue)} para ${fmt(val)}. Motivo: ${reason}`
+                      );
+                      onUpdateQuote(updated);
+                      setAdjustingValue(false);
+                      setNewContractValue("");
+                      setContractAdjustReason("");
+                    }}
+                    className="flex-1 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Confirmar ajuste
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Ajustar datas — só em análise */}
+        {quote.status === "Em análise" && (
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Ajustar datas</p>
+              {!adjustingDates && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewStartDate(
+                      quote.startDate && quote.startDate.includes("/")
+                        ? quote.startDate.split("/").reverse().join("-")
+                        : quote.startDate || ""
+                    );
+                    setNewEndDate(
+                      quote.endDate && quote.endDate.includes("/")
+                        ? quote.endDate.split("/").reverse().join("-")
+                        : quote.endDate || ""
+                    );
+                    setDatesAdjustReason("");
+                    setAdjustingDates(true);
+                  }}
+                  className="text-xs text-accent hover:text-amber-600 font-medium transition-colors flex items-center gap-1"
+                >
+                  <Pencil size={12} /> Ajustar
+                </button>
+              )}
+            </div>
+            {!adjustingDates ? (
+              <div className="space-y-1.5 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground flex items-center gap-1.5"><CalendarDays size={12} className="text-accent" /> Início da obra</span>
+                  <span className="font-mono font-medium">{quote.startDate || "—"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground flex items-center gap-1.5"><CalendarCheck size={12} className="text-accent" /> Entrega prevista</span>
+                  <span className="font-mono font-medium">{quote.endDate || "—"}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1.5 flex items-center gap-1"><CalendarDays size={11} className="text-accent" /> Início da obra</label>
+                    <input
+                      type="date"
+                      value={newStartDate}
+                      onChange={e => setNewStartDate(e.target.value)}
+                      className="w-full bg-input-background rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 ring-accent/40 border border-border font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1.5 flex items-center gap-1"><CalendarCheck size={11} className="text-accent" /> Entrega prevista</label>
+                    <input
+                      type="date"
+                      value={newEndDate}
+                      onChange={e => setNewEndDate(e.target.value)}
+                      className="w-full bg-input-background rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 ring-accent/40 border border-border font-mono"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1.5">Motivo do ajuste <span className="text-accent">*</span></label>
+                  <textarea
+                    value={datesAdjustReason}
+                    onChange={e => setDatesAdjustReason(e.target.value)}
+                    rows={2}
+                    placeholder="Ex: renegociação do prazo com o cliente..."
+                    className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground resize-none"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setAdjustingDates(false); setDatesAdjustReason(""); }}
+                    className="flex-1 py-2 bg-muted text-muted-foreground rounded-lg text-xs font-medium hover:bg-secondary transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!datesAdjustReason.trim()}
+                    onClick={() => {
+                      const startFmt = newStartDate ? new Date(newStartDate + "T12:00:00").toLocaleDateString("pt-BR") : quote.startDate;
+                      const endFmt = newEndDate ? new Date(newEndDate + "T12:00:00").toLocaleDateString("pt-BR") : quote.endDate;
+                      const reason = datesAdjustReason.trim();
+                      const updated = addHistory(
+                        { ...quote, startDate: startFmt || "", endDate: endFmt || "" },
+                        `Datas ajustadas — Início: ${startFmt || "—"}, Entrega: ${endFmt || "—"}. Motivo: ${reason}`
+                      );
+                      onUpdateQuote(updated);
+                      setAdjustingDates(false);
+                      setDatesAdjustReason("");
+                    }}
+                    className="flex-1 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Confirmar ajuste
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
