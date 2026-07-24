@@ -1,4 +1,9 @@
 import { useState, useEffect } from "react";
+import FullCalendar from "@fullcalendar/react";
+import dayGridPlugin from "@fullcalendar/react/daygrid";
+import listPlugin from "@fullcalendar/react/list";
+import classicThemePlugin from "@fullcalendar/react/themes/classic";
+import ptBrLocale from "@fullcalendar/react/locales/pt-br";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
@@ -1654,160 +1659,108 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
 
         {/* TAB: Cronograma */}
         {tab === "cronograma" && (() => {
-          const parseD = (d: string): Date | null => {
-            if (!d) return null;
+          const toISO = (d: string): string | null => {
+            if (!d || d === "–") return null;
             if (d.includes("/")) {
-              const [dd, mm, yyyy] = d.split("/").map(Number);
-              return new Date(yyyy, mm - 1, dd);
+              const parts = d.split("/").map(Number);
+              if (parts.length < 3 || parts.some(isNaN)) return null;
+              const [dd, mm, yyyy] = parts;
+              return `${yyyy}-${String(mm).padStart(2,"0")}-${String(dd).padStart(2,"0")}`;
             }
-            if (d.includes("-")) return new Date(d + "T12:00:00");
+            if (d.includes("-")) return d.split("T")[0];
             return null;
           };
-          const allDates = milestones.flatMap(m => [
-            parseD(m.startDate ?? ""), parseD(m.deadline), parseD(m.completedAt)
-          ]).filter(Boolean) as Date[];
-          const projStart = parseD(project.startDate) ?? (allDates.length ? new Date(Math.min(...allDates.map(d => d.getTime()))) : new Date());
-          const projEnd   = parseD(project.endDate)   ?? (allDates.length ? new Date(Math.max(...allDates.map(d => d.getTime()))) : new Date());
-          const span = projEnd.getTime() - projStart.getTime() || 1;
-          const pct = (d: Date) => Math.min(100, Math.max(0, ((d.getTime() - projStart.getTime()) / span) * 100));
-          const today = new Date();
-          const todayPct = pct(today);
-          const STATUS_COLORS: Record<StepStatus, string> = {
-            "Concluído":   "bg-emerald-500",
-            "Em andamento": "bg-accent",
-            "Pendente":    "bg-muted-foreground/40",
-            "Cancelado":   "bg-red-500/50",
+
+          const STATUS_HEX: Record<StepStatus, string> = {
+            "Concluído":    "#22c55e",
+            "Em andamento": "#D97706",
+            "Pendente":     "#94A3B8",
+            "Cancelado":    "#EF4444",
           };
-          const monthNames = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
-          const monthMarkers: { label: string; pos: number }[] = [];
-          const cur = new Date(projStart.getFullYear(), projStart.getMonth(), 1);
-          while (cur <= projEnd) {
-            monthMarkers.push({
-              label: `${monthNames[cur.getMonth()]}/${String(cur.getFullYear()).slice(-2)}`,
-              pos: pct(new Date(cur)),
-            });
-            cur.setMonth(cur.getMonth() + 1);
-          }
-          const semData = milestones.filter(m => !parseD(m.startDate ?? "")).length;
-          const comData = milestones.length - semData;
-          if (comData === 0) {
-            return (
-              <div className="p-8 text-center">
-                <CalendarDays size={32} className="mx-auto text-muted-foreground/30 mb-3" />
-                <p className="text-sm text-muted-foreground">Nenhuma etapa com data de início definida.</p>
-                <p className="text-xs text-muted-foreground/60 mt-1">
-                  Defina a data de início das etapas para visualizar o cronograma.
-                </p>
-              </div>
-            );
-          }
+
+          type CalEvent = {
+            title: string;
+            start: string;
+            end?: string;
+            color?: string;
+            extendedProps?: { typeLabel: string };
+          };
+
+          const calEvents: CalEvent[] = [
+            // Project start/end markers
+            ...(toISO(localStartDate) ? [{ title: "Início da obra", start: toISO(localStartDate)!, color: "#1C2B3A", extendedProps: { typeLabel: "Obra" } }] : []),
+            ...(toISO(localEndDate) ? [{ title: "Entrega prevista", start: toISO(localEndDate)!, color: "#64748B", extendedProps: { typeLabel: "Obra" } }] : []),
+            // Milestones
+            ...milestones.flatMap(m => {
+              const start = toISO(m.startDate ?? "");
+              if (!start) return [];
+              const end = toISO(m.deadline);
+              return [{ title: m.label, start, end: end ?? undefined, color: STATUS_HEX[m.status], extendedProps: { typeLabel: "Etapa" } }];
+            }),
+            // Pending payments
+            ...expenses
+              .filter(e => e.isPayment && e.paymentStatus === "A fazer" && e.dueDate)
+              .map(e => ({ title: e.description, start: e.dueDate!, color: "#F59E0B", extendedProps: { typeLabel: "Pagamento" } })),
+          ];
+
+          const sortedList = [...calEvents]
+            .map(e => ({ ...e, dateObj: new Date(e.start + "T12:00:00") }))
+            .filter(e => !isNaN(e.dateObj.getTime()))
+            .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+
           return (
-            <div className="p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground">Cronograma de etapas</h3>
-                <span className="text-[10px] text-muted-foreground font-mono">
-                  {project.startDate} → {project.endDate}
-                </span>
+            <div className="p-4 space-y-5">
+              {/* FullCalendar */}
+              <div className="fc-cronograma overflow-hidden rounded-xl border border-border bg-card">
+                <style>{`
+                  .fc-cronograma {
+                    --fc-classic-button: #1C2B3A;
+                    --fc-classic-button-border: #1C2B3A;
+                    --fc-classic-button-strong: #0D1A24;
+                    --fc-classic-button-strong-border: #0A1520;
+                    --fc-classic-primary: #D97706;
+                    --fc-classic-primary-foreground: #fff;
+                    --fc-classic-today: rgba(217,119,6,0.08);
+                    --fc-classic-background: transparent;
+                    --fc-classic-border: #E8E5DF;
+                    --fc-classic-foreground: #1C1917;
+                    --fc-classic-faint-foreground: #A8A29E;
+                    --fc-classic-muted-foreground: #78716C;
+                  }
+                `}</style>
+                <FullCalendar
+                  plugins={[dayGridPlugin, listPlugin, classicThemePlugin]}
+                  locale={ptBrLocale}
+                  initialView="dayGridMonth"
+                  initialDate={toISO(localStartDate) ?? undefined}
+                  headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,listMonth" }}
+                  height="auto"
+                  events={calEvents}
+                />
               </div>
 
-              {/* Gantt: scrollável horizontalmente em telas pequenas */}
-              <div className="overflow-x-auto -mx-4 px-4" style={{ scrollbarWidth: "thin" } as React.CSSProperties}>
-                <div style={{ minWidth: 520 }}>
-                  {/* Régua de meses — alinhada à coluna das barras */}
-                  <div className="flex items-end gap-3">
-                    <div className="w-36 shrink-0" />
-                    <div className="relative flex-1 h-4">
-                      {monthMarkers.map((mk, i) => (
-                        <span
-                          key={i}
-                          className="absolute text-[9px] text-muted-foreground font-mono whitespace-nowrap"
-                          style={{ left: `${mk.pos}%`, bottom: 0 }}
-                        >{mk.label}</span>
-                      ))}
-                    </div>
-                    <div className="w-24 shrink-0" />
+              {/* Timeline list */}
+              {sortedList.length > 0 && (
+                <div className="bg-card border border-border rounded-xl overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Todos os eventos</p>
                   </div>
-
-                  {/* Barras das etapas */}
-                  <div className="relative mt-2 pt-4">
-                    {/* Linha "Hoje" spanning todas as linhas — left = 9.75rem + todayPct% of bars area (100% - 16.5rem) */}
-                    {todayPct >= 0 && todayPct <= 100 && (
-                      <div
-                        className="absolute top-0 bottom-0 z-20 pointer-events-none"
-                        style={{ left: `calc(${(9.75 - todayPct * 16.5 / 100).toFixed(4)}rem + ${todayPct}%)` }}
-                      >
-                        <div className="w-0.5 h-full bg-red-500 opacity-80" />
-                        <span className="absolute top-0 -translate-x-1/2 text-[9px] font-semibold text-red-500 bg-background/90 px-1 rounded whitespace-nowrap leading-none py-0.5">Hoje</span>
-                      </div>
-                    )}
-                    <div className="space-y-2.5">
-                    {milestones.map((m, i) => {
-                      const start = parseD(m.startDate ?? "");
-                      const end   = parseD(m.deadline) ?? start;
-                      if (!start || !end) return null;
-                      const left  = pct(start);
-                      const width = Math.max(1.5, pct(end) - left);
-                      const realStart = parseD(m.startedAt ?? "");
-                      const cfg = STEP_STATUS_CONFIG[m.status];
-                      return (
-                        <div key={i} className="flex items-center gap-3">
-                          <div className="w-36 shrink-0 text-right">
-                            <span className="text-[11px] text-foreground leading-tight line-clamp-2">{m.label}</span>
-                          </div>
-                          <div className="relative flex-1 h-6">
-                            {monthMarkers.map((mk, j) => (
-                              <div key={j} className="absolute inset-y-0 w-px bg-border/60" style={{ left: `${mk.pos}%` }} />
-                            ))}
-                            <div className="absolute inset-y-0 left-0 right-0 rounded-full bg-muted/40" />
-                            <div
-                              className={`absolute inset-y-1 rounded-full ${STATUS_COLORS[m.status]} transition-all`}
-                              style={{ left: `${left}%`, width: `${width}%` }}
-                              title={`Previsto: ${fmtDate(m.startDate ?? "")} → ${fmtDate(m.deadline)}`}
-                            />
-                            {realStart && (
-                              <div
-                                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-2 rotate-45 bg-blue-500 border border-white/70 z-20"
-                                style={{ left: `${pct(realStart)}%` }}
-                                title={`Início real: ${fmtDate(m.startedAt ?? "")}`}
-                              />
-                            )}
-                          </div>
-                          <div className="w-24 shrink-0">
-                            <span className={`inline-block whitespace-nowrap text-[9px] px-1.5 py-0.5 rounded border ${cfg.color}`}>{cfg.label}</span>
-                          </div>
+                  <div className="divide-y divide-border">
+                    {sortedList.map((ev, i) => (
+                      <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: ev.color ?? "#94A3B8" }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-foreground truncate">{ev.title}</p>
+                          <p className="text-[10px] text-muted-foreground">{ev.extendedProps?.typeLabel}</p>
                         </div>
-                      );
-                    })}
-                    </div>
+                        <span className="text-xs font-mono text-muted-foreground shrink-0">
+                          {ev.dateObj.toLocaleDateString("pt-BR")}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-
-              {/* Aviso de etapas sem data de início */}
-              {semData > 0 && (
-                <p className="text-[10px] text-amber-500/90 flex items-center gap-1.5">
-                  <AlertTriangle size={11} />
-                  {semData} etapa{semData > 1 ? "s" : ""} sem data de início não aparece{semData > 1 ? "m" : ""} no cronograma.
-                </p>
               )}
-
-              {/* Legenda */}
-              <div className="flex flex-wrap gap-3 pt-2 border-t border-border">
-                {(["Concluído","Em andamento","Pendente","Cancelado"] as StepStatus[]).map(s => (
-                  <div key={s} className="flex items-center gap-1.5">
-                    <div className={`w-3 h-2 rounded-full ${STATUS_COLORS[s]}`} />
-                    <span className="text-[10px] text-muted-foreground">{s}</span>
-                  </div>
-                ))}
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rotate-45 bg-blue-500 border border-white/70" />
-                  <span className="text-[10px] text-muted-foreground">Início real</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-px h-3 bg-red-500/70" />
-                  <span className="text-[10px] text-muted-foreground">Hoje</span>
-                </div>
-              </div>
             </div>
           );
         })()}
