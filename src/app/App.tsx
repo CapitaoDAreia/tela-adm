@@ -40,6 +40,16 @@ const parseAnyDate = (d: string): Date | null => {
   return null;
 };
 
+const PROJECT_COVER_GRADIENTS = [
+  "linear-gradient(135deg, #1C2B3A 0%, #2D4356 100%)",
+  "linear-gradient(135deg, #78350F 0%, #B45309 100%)",
+  "linear-gradient(135deg, #1A4031 0%, #2D6A4F 100%)",
+  "linear-gradient(135deg, #312E81 0%, #4F46E5 100%)",
+  "linear-gradient(135deg, #134E4A 0%, #0F766E 100%)",
+  "linear-gradient(135deg, #7F1D1D 0%, #B91C1C 100%)",
+];
+const projectCoverGradient = (id: number) => PROJECT_COVER_GRADIENTS[id % PROJECT_COVER_GRADIENTS.length];
+
 const statusColors: Record<ProjectStatus, string> = {
   "Em andamento": "bg-blue-100 text-blue-700",
   "Concluído": "bg-green-100 text-green-700",
@@ -384,11 +394,15 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
                 }`}
               >
                 <div className="relative h-28 overflow-hidden bg-muted">
-                  <img
-                    src={project.image}
-                    alt={project.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
+                  {project.image ? (
+                    <img
+                      src={project.image}
+                      alt={project.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full" style={{ background: projectCoverGradient(project.id) }} />
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                   <div className="absolute bottom-2 left-3 right-3 flex items-end justify-between">
                     <span className="text-white text-sm font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>
@@ -1246,7 +1260,11 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
     <div className="min-h-screen bg-background">
       {/* Header image */}
       <div className="relative h-52 bg-muted overflow-hidden">
-        <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
+        {project.image ? (
+          <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full" style={{ background: projectCoverGradient(project.id) }} />
+        )}
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
         <button
           onClick={onBack}
@@ -1713,29 +1731,140 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
               {/* FullCalendar */}
               <div className="fc-cronograma overflow-hidden rounded-xl border border-border bg-card">
                 <style>{`
+                  /* ─── CSS variables (colors) ──────────────────────────────── */
                   .fc-cronograma {
-                    --fc-classic-button: #1C2B3A;
-                    --fc-classic-button-border: #1C2B3A;
-                    --fc-classic-button-strong: #0D1A24;
-                    --fc-classic-button-strong-border: #0A1520;
+                    --fc-classic-button: #f5f4f1;
+                    --fc-classic-button-border: #dedad4;
+                    --fc-classic-button-foreground: #44403c;
+                    --fc-classic-button-strong: #1C2B3A;
+                    --fc-classic-button-strong-border: #1C2B3A;
                     --fc-classic-primary: #D97706;
                     --fc-classic-primary-foreground: #fff;
-                    --fc-classic-today: rgba(217,119,6,0.08);
+                    --fc-classic-today: rgba(217,119,6,0.09);
                     --fc-classic-background: transparent;
-                    --fc-classic-border: #E8E5DF;
+                    --fc-classic-border: #e8e5df;
                     --fc-classic-foreground: #1C1917;
-                    --fc-classic-faint-foreground: #A8A29E;
+                    --fc-classic-faint: #f7f6f3;
+                    --fc-classic-faint-foreground: #a8a29e;
+                    --fc-classic-muted: #f0ede8;
                     --fc-classic-muted-foreground: #78716C;
+                    --fc-classic-ring-color: rgba(217,119,6,0.28);
                   }
+                  /* ─── Toolbar: nowrap, padding ────────────────────────────── */
+                  .fc-cronograma div:has(> div:has(> [role="heading"])) {
+                    padding: 9px 12px !important;
+                    flex-wrap: nowrap !important;
+                    align-items: center !important;
+                    gap: 6px !important;
+                  }
+                  .fc-cronograma div:has(> [role="heading"]) {
+                    flex: 1 1 0% !important;
+                    justify-content: center !important;
+                    min-width: 0 !important;
+                  }
+                  /* ─── Month/year heading ──────────────────────────────────── */
+                  .fc-cronograma [role="heading"] {
+                    font-size: 13px !important;
+                    font-weight: 600 !important;
+                    letter-spacing: -0.01em !important;
+                    white-space: nowrap !important;
+                    overflow: hidden !important;
+                    text-overflow: ellipsis !important;
+                  }
+                  /* ─── All toolbar buttons ─────────────────────────────────── */
+                  .fc-cronograma button[type="button"] {
+                    padding: 4px 9px !important;
+                    font-size: 12px !important;
+                    font-weight: 500 !important;
+                    line-height: 1.5 !important;
+                    border-radius: 7px !important;
+                    letter-spacing: 0 !important;
+                    box-shadow: none !important;
+                    outline: none !important;
+                    white-space: nowrap !important;
+                  }
+                  .fc-cronograma button[type="button"]:focus {
+                    box-shadow: 0 0 0 2px rgba(217,119,6,0.28) !important;
+                  }
+                  .fc-cronograma button[type="button"] svg {
+                    width: 14px !important;
+                    height: 14px !important;
+                  }
+                  /* View toggle tabs */
+                  .fc-cronograma [role="tab"] {
+                    padding: 4px 10px !important;
+                    font-size: 12px !important;
+                    border-radius: 0 !important;
+                  }
+                  /* ─── Day column headers ──────────────────────────────────── */
+                  .fc-cronograma [role="columnheader"] {
+                    padding: 4px 2px !important;
+                    font-size: 10.5px !important;
+                    font-weight: 500 !important;
+                    letter-spacing: 0.05em !important;
+                    text-transform: uppercase !important;
+                    color: #78716C !important;
+                  }
+                  .fc-cronograma [role="columnheader"] a {
+                    text-decoration: none !important;
+                    color: inherit !important;
+                    cursor: default !important;
+                    pointer-events: none !important;
+                  }
+                  /* ─── Day numbers ─────────────────────────────────────────── */
+                  .fc-cronograma [role="gridcell"] a:not([role="button"]) {
+                    font-size: 11px !important;
+                    text-decoration: none !important;
+                    padding: 2px 4px !important;
+                    color: #57534e !important;
+                    cursor: default !important;
+                    pointer-events: none !important;
+                  }
+                  /* ─── Dark mode ───────────────────────────────────────────── */
+                  @media (prefers-color-scheme: dark) {
+                    .fc-cronograma {
+                      --fc-classic-button: #2a2520;
+                      --fc-classic-button-border: #3d3830;
+                      --fc-classic-button-foreground: #c8c4be;
+                      --fc-classic-button-strong: #D97706;
+                      --fc-classic-button-strong-border: #D97706;
+                      --fc-classic-border: #3d3830;
+                      --fc-classic-foreground: #f5f4f1;
+                      --fc-classic-faint: #1e1a17;
+                      --fc-classic-faint-foreground: #5a5550;
+                      --fc-classic-muted: #252018;
+                      --fc-classic-muted-foreground: #a09890;
+                      --fc-classic-today: rgba(217,119,6,0.13);
+                    }
+                    .fc-cronograma [role="columnheader"] { color: #807870 !important; }
+                    .fc-cronograma [role="gridcell"] a:not([role="button"]) { color: #9a9490 !important; }
+                  }
+                  :root[data-theme="dark"] .fc-cronograma {
+                    --fc-classic-button: #2a2520;
+                    --fc-classic-button-border: #3d3830;
+                    --fc-classic-button-foreground: #c8c4be;
+                    --fc-classic-button-strong: #D97706;
+                    --fc-classic-button-strong-border: #D97706;
+                    --fc-classic-border: #3d3830;
+                    --fc-classic-foreground: #f5f4f1;
+                    --fc-classic-faint: #1e1a17;
+                    --fc-classic-faint-foreground: #5a5550;
+                    --fc-classic-muted: #252018;
+                    --fc-classic-muted-foreground: #a09890;
+                    --fc-classic-today: rgba(217,119,6,0.13);
+                  }
+                  :root[data-theme="dark"] .fc-cronograma [role="columnheader"] { color: #807870 !important; }
+                  :root[data-theme="dark"] .fc-cronograma [role="gridcell"] a:not([role="button"]) { color: #9a9490 !important; }
                 `}</style>
                 <FullCalendar
                   plugins={[dayGridPlugin, listPlugin, classicThemePlugin]}
                   locale={ptBrLocale}
                   initialView="dayGridMonth"
                   initialDate={toISO(localStartDate) ?? undefined}
-                  headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,listMonth" }}
+                  headerToolbar={{ left: "prev,next", center: "title", right: "dayGridMonth,listMonth" }}
                   height="auto"
                   events={calEvents}
+                  eventDisplay="block"
                 />
               </div>
 
@@ -3664,7 +3793,11 @@ function ReportModal({ project, onClose }: { project: Project; onClose: () => vo
         {/* Capa */}
         <div className="bg-card border border-border rounded-xl overflow-hidden mb-4">
           <div className="relative h-36 bg-muted">
-            <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
+            {project.image ? (
+              <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full" style={{ background: projectCoverGradient(project.id) }} />
+            )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
             <div className="absolute bottom-3 left-4 right-4">
               <p className="text-white/70 text-xs">{project.location}</p>
