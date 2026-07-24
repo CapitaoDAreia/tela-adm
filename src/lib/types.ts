@@ -35,6 +35,7 @@ export type QuoteStatus = "Solicitado" | "Em análise" | "Aprovado" | "Cancelado
 export interface QuoteHistoryEntry {
   datetime: string;
   description: string;
+  changedBy?: string;
 }
 
 export interface QuoteRecord {
@@ -103,11 +104,13 @@ export interface Milestone {
   contractorValue?: number;
   contractorStatus?: "Não contratado" | "Contratado" | "Em execução" | "Concluído";
   materials?: MilestoneMaterial[];
+  contractorPaymentDue?: string;
 }
 
 export interface ProjectHistoryEntry {
   datetime: string;
   description: string;
+  changedBy?: string;
 }
 
 export interface ProjectPhoto {

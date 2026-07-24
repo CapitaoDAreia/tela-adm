@@ -249,14 +249,6 @@ function Dashboard({ projects, onOpenProject, onNewProject }: {
             `${projects.length} total`,
             { card: "bg-blue-50 border-blue-200 hover:border-blue-300", ring: "ring-blue-300", val: "text-blue-900", lbl: "text-blue-800", sub: "text-blue-700" }
           )}
-          {indCard(
-            "entregas",
-            <PackagePlus size={15} className={materiaisUrgentes.length > 0 ? "text-amber-600" : "text-green-600"} />,
-            materiaisUrgentes.length > 0 ? String(materiaisUrgentes.length) : "—",
-            "Mat. a pedir",
-            materiaisUrgentes.length > 0 ? `${materiaisUrgentes.length} etapa${materiaisUrgentes.length > 1 ? "s" : ""} urgente${materiaisUrgentes.length > 1 ? "s" : ""}` : "Nenhum urgente",
-            materiaisUrgentes.length > 0 ? { card: "bg-amber-50 border-amber-200 hover:border-amber-300", ring: "ring-amber-300", val: "text-amber-900", lbl: "text-amber-800", sub: "text-amber-700" } : null
-          )}
         </div>
 
         <div className="px-4 space-y-5">
@@ -662,7 +654,7 @@ function StepModal({ step, onClose, onSave, isNew = false, projectStartDate }: {
             <label className="text-xs font-medium text-muted-foreground block flex items-center gap-1.5">
               <CalendarClock size={11} className="text-accent" /> Prazo previsto
             </label>
-            {isNew ? (
+            {isNew || !draft.deadline ? (
               <input
                 type="date"
                 value={draft.deadline}
@@ -834,6 +826,17 @@ function StepModal({ step, onClose, onSave, isNew = false, projectStartDate }: {
                   />
                 </div>
               </div>
+              {draft.contractorValue != null && draft.contractorValue > 0 && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1.5">Vencimento do pagamento</label>
+                  <input
+                    type="date"
+                    value={draft.contractorPaymentDue ?? ""}
+                    onChange={e => setDraft({ ...draft, contractorPaymentDue: e.target.value || undefined })}
+                    className="w-full bg-input-background rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -1092,6 +1095,14 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
   const [photos, setPhotos] = useState(project.photos);
   const [documents, setDocuments] = useState<ProjectDocument[]>(project.documents ?? []);
   const [lightboxPhoto, setLightboxPhoto] = useState<{ url: string; caption: string; date: string } | null>(null);
+  const [showProjectHistory, setShowProjectHistory] = useState(false);
+  const [history, setHistory] = useState(project.history ?? []);
+  const [adjustingDates, setAdjustingDates] = useState(false);
+  const [newStartDate, setNewStartDate] = useState("");
+  const [newEndDate, setNewEndDate] = useState("");
+  const [datesReason, setDatesReason] = useState("");
+  const [localStartDate, setLocalStartDate] = useState(project.startDate);
+  const [localEndDate, setLocalEndDate] = useState(project.endDate);
 
   const computedProgress = milestones.length > 0
     ? Math.round(milestones.filter(m => m.status === "Concluído").length / milestones.length * 100)
@@ -1106,7 +1117,8 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
     return "Concluída";
   })();
 
-  const propagate = (newMilestones: Milestone[]) => {
+  const propagate = (newMilestones: Milestone[], overrideExpenses?: Expense[]) => {
+    const exp = overrideExpenses ?? expenses;
     const progress = newMilestones.length > 0
       ? Math.round(newMilestones.filter(m => m.status === "Concluído").length / newMilestones.length * 100)
       : project.progress;
@@ -1116,7 +1128,27 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
       : inProg ? inProg.label
       : next ? next.label
       : "Concluída";
-    onUpdateProject?.({ ...project, milestones: newMilestones, expenses, status, progress, phase });
+    onUpdateProject?.({ ...project, milestones: newMilestones, expenses: exp, status, progress, phase });
+  };
+
+  const contractorExpenseForMilestone = (m: Milestone, currentExpenses: Expense[]): Expense[] => {
+    const expDesc = `Pagamento empreiteiro — ${m.label}`;
+    const filtered = currentExpenses.filter(e => e.description !== expDesc);
+    if (!m.contractorValue || m.contractorValue <= 0) return filtered;
+    const mths = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+    const dateStr = m.contractorPaymentDue
+      ? (() => { const d = new Date(m.contractorPaymentDue + "T12:00:00"); return `${String(d.getDate()).padStart(2,"0")} ${mths[d.getMonth()]} ${d.getFullYear()}`; })()
+      : (() => { const d = new Date(); return `${String(d.getDate()).padStart(2,"0")} ${mths[d.getMonth()]} ${d.getFullYear()}`; })();
+    return [...filtered, {
+      id: Date.now(),
+      date: dateStr,
+      description: expDesc,
+      category: "Serviço",
+      amount: m.contractorValue,
+      isPayment: true,
+      paymentStatus: "A fazer" as const,
+      dueDate: m.contractorPaymentDue || undefined,
+    }];
   };
   const [editingStep, setEditingStep] = useState<Milestone | null>(null);
   const [creatingStep, setCreatingStep] = useState(false);
@@ -1136,10 +1168,11 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
     return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
   };
 
-  const addProjectHistory = (p: Project, description: string): Project => ({
-    ...p,
-    history: [...(p.history ?? []), { datetime: nowTs(), description }],
-  });
+  const addProjectHistory = (p: Project, description: string): Project => {
+    const entry = { datetime: nowTs(), description };
+    setHistory(prev => [...prev, entry]);
+    return { ...p, history: [...(p.history ?? []), entry] };
+  };
 
   const allConcluded = milestones.length > 0 && milestones.every(m => m.status === "Concluído" || m.status === "Cancelado");
   const hasPendingPayments = expenses.some(e => e.isPayment && e.paymentStatus === "A fazer");
@@ -1215,6 +1248,13 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
           className="absolute top-4 left-4 bg-white/20 backdrop-blur-sm rounded-full p-2 text-white hover:bg-white/30 transition-colors"
         >
           <ArrowLeft size={18} />
+        </button>
+        <button
+          onClick={() => setShowProjectHistory(true)}
+          className="absolute top-4 right-14 bg-white/20 backdrop-blur-sm rounded-full p-2 text-white hover:bg-white/30 transition-colors"
+          title="Histórico da obra"
+        >
+          <Clock size={18} />
         </button>
         <button
           onClick={() => setShowReport(true)}
@@ -1349,30 +1389,112 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
 
             {/* Dates */}
             <div className="bg-card border border-border rounded-xl p-4">
-              <p className="text-xs text-muted-foreground font-mono mb-3">Datas</p>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <CalendarClock size={14} className="text-accent" />
-                    <span>Fechamento do orçamento</span>
-                  </div>
-                  <span className="text-sm font-mono font-medium text-foreground">{project.quoteDeadline}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <CalendarDays size={14} className="text-accent" />
-                    <span>Início da obra</span>
-                  </div>
-                  <span className="text-sm font-mono font-medium text-foreground">{project.startDate}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <CalendarCheck size={14} className="text-accent" />
-                    <span>Entrega prevista</span>
-                  </div>
-                  <span className="text-sm font-mono font-medium text-foreground">{project.endDate}</span>
-                </div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-muted-foreground font-mono">Datas</p>
+                {!adjustingDates && (
+                  <button
+                    type="button"
+                    onClick={() => setAdjustingDates(true)}
+                    className="text-xs text-accent hover:text-amber-600 font-medium flex items-center gap-1 transition-colors"
+                  >
+                    <Pencil size={11} /> Ajustar datas
+                  </button>
+                )}
               </div>
+              {adjustingDates ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-1">Novo início</label>
+                      <input
+                        type="date"
+                        value={newStartDate}
+                        onChange={e => setNewStartDate(e.target.value)}
+                        className="w-full bg-input-background rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-1">Nova entrega</label>
+                      <input
+                        type="date"
+                        value={newEndDate}
+                        onChange={e => setNewEndDate(e.target.value)}
+                        className="w-full bg-input-background rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground block mb-1">Motivo <span className="text-muted-foreground/50">(opcional)</span></label>
+                    <textarea
+                      value={datesReason}
+                      onChange={e => setDatesReason(e.target.value)}
+                      rows={2}
+                      placeholder="Ex: prazo estendido por chuvas..."
+                      className="w-full bg-input-background rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 ring-accent/40 border border-border text-foreground resize-none"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setAdjustingDates(false); setNewStartDate(""); setNewEndDate(""); setDatesReason(""); }}
+                      className="flex-1 py-2 bg-muted text-muted-foreground rounded-lg text-xs font-medium hover:bg-secondary transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!newStartDate && !newEndDate}
+                      onClick={() => {
+                        const fmt2 = (iso: string) => new Date(iso + "T12:00:00").toLocaleDateString("pt-BR");
+                        const parts: string[] = [];
+                        if (newStartDate) parts.push(`Início alterado para ${fmt2(newStartDate)}`);
+                        if (newEndDate) parts.push(`Entrega alterada para ${fmt2(newEndDate)}`);
+                        if (datesReason.trim()) parts.push(`Motivo: ${datesReason.trim()}`);
+                        const newStart = newStartDate ? fmt2(newStartDate) : localStartDate;
+                        const newEnd = newEndDate ? fmt2(newEndDate) : localEndDate;
+                        if (newStartDate) setLocalStartDate(newStart);
+                        if (newEndDate) setLocalEndDate(newEnd);
+                        const updated = addProjectHistory(
+                          { ...project, milestones, expenses, status, progress: computedProgress, phase: computedPhase, startDate: newStart, endDate: newEnd },
+                          parts.join(" · ") || "Datas da obra ajustadas."
+                        );
+                        onUpdateProject?.(updated);
+                        setAdjustingDates(false);
+                        setNewStartDate("");
+                        setNewEndDate("");
+                        setDatesReason("");
+                      }}
+                      className="flex-1 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/80 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                    >
+                      Salvar datas
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <CalendarClock size={14} className="text-accent" />
+                      <span>Fechamento do orçamento</span>
+                    </div>
+                    <span className="text-sm font-mono font-medium text-foreground">{project.quoteDeadline}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <CalendarDays size={14} className="text-accent" />
+                      <span>Início da obra</span>
+                    </div>
+                    <span className="text-sm font-mono font-medium text-foreground">{localStartDate}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <CalendarCheck size={14} className="text-accent" />
+                      <span>Entrega prevista</span>
+                    </div>
+                    <span className="text-sm font-mono font-medium text-foreground">{localEndDate}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Financeiro */}
@@ -1460,19 +1582,29 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
 
             {milestones.map((m, i) => {
               const cfg = STEP_STATUS_CONFIG[m.status];
+              const todayRef = new Date(); todayRef.setHours(0,0,0,0);
+              const isOverdue = !!(m.deadline && m.status !== "Concluído" && m.status !== "Cancelado" && (() => {
+                const d = m.deadline.includes("/")
+                  ? (() => { const [dd, mm, yyyy] = m.deadline.split("/").map(Number); return new Date(yyyy, mm-1, dd); })()
+                  : new Date(m.deadline + "T12:00:00");
+                return d < todayRef;
+              })());
               return (
                 <button
                   key={i}
                   onClick={() => setEditingStep(m)}
-                  className="w-full bg-card border border-border rounded-xl px-4 py-3.5 flex items-center gap-3 text-left hover:border-accent/40 transition-colors group"
+                  className={`w-full bg-card border rounded-xl px-4 py-3.5 flex items-center gap-3 text-left hover:border-accent/40 transition-colors group ${isOverdue ? "border-red-200" : "border-border"}`}
                 >
                   <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.dot}`} />
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium leading-snug ${m.status === "Cancelado" ? "line-through text-muted-foreground" : "text-foreground"}`}>
                       {m.label}
                     </p>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded border whitespace-nowrap ${cfg.color}`}>{cfg.label}</span>
+                      {isOverdue && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border bg-red-100 text-red-700 border-red-200 font-medium whitespace-nowrap">Em atraso</span>
+                      )}
                       {m.startDate && (
                         <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-0.5">
                           <CalendarDays size={9} /> {fmtDate(m.startDate)}
@@ -1820,6 +1952,55 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
       </div>
 
 
+      {/* Project history modal */}
+      {showProjectHistory && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowProjectHistory(false)} />
+          <div className="relative w-full max-w-lg bg-card border border-border rounded-t-2xl sm:rounded-2xl z-10 max-h-[80vh] flex flex-col">
+            <div className="flex justify-center pt-3 pb-1 sm:hidden">
+              <div className="w-10 h-1 rounded-full bg-border" />
+            </div>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+              <div className="flex items-center gap-2">
+                <Clock size={16} className="text-accent" />
+                <h3 className="text-base font-semibold text-foreground" style={{ fontFamily: "'DM Serif Display', serif" }}>
+                  Histórico da obra
+                </h3>
+              </div>
+              <button onClick={() => setShowProjectHistory(false)} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="overflow-y-auto px-5 py-4">
+              {history.length === 0 ? (
+                <div className="text-center py-8">
+                  <Clock size={28} className="text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">Nenhum evento registrado.</p>
+                </div>
+              ) : (
+                <div className="relative">
+                  <div className="absolute left-[5px] top-2 bottom-2 w-px bg-border" />
+                  <div className="space-y-4">
+                    {[...history].reverse().map((entry, i) => (
+                      <div key={i} className="flex gap-3 items-start">
+                        <div className="w-2.5 h-2.5 rounded-full bg-accent border-2 border-background shrink-0 mt-1 relative z-10" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-muted-foreground font-mono">{entry.datetime}</p>
+                          <p className="text-sm text-foreground leading-snug mt-0.5">{entry.description}</p>
+                          {entry.changedBy && (
+                            <p className="text-[10px] text-muted-foreground/60 mt-0.5">por {entry.changedBy}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Lightbox */}
       {lightboxPhoto && (
         <div
@@ -1956,7 +2137,9 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
           onSave={updated => {
             const next = milestones.map(m => m.label === editingStep.label ? updated : m);
             setMilestones(next);
-            propagate(next);
+            const newExpenses = contractorExpenseForMilestone(updated, expenses);
+            if (newExpenses !== expenses) setExpenses(newExpenses);
+            propagate(next, newExpenses);
           }}
         />
       )}
@@ -1971,7 +2154,9 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
           onSave={newStep => {
             const next = [...milestones, newStep];
             setMilestones(next);
-            propagate(next);
+            const newExpenses = contractorExpenseForMilestone(newStep, expenses);
+            if (newExpenses !== expenses) setExpenses(newExpenses);
+            propagate(next, newExpenses);
           }}
         />
       )}
@@ -2997,14 +3182,14 @@ function QuoteDetail({
               <p className="text-xs text-muted-foreground font-mono">Análise iniciada em {quote.analysisStartedAt}</p>
             )}
             {confirmingApproval ? (
-              <div className={`rounded-xl border p-4 space-y-3 ${margin >= 0 ? "border-green-800/40 bg-green-900/10" : "border-red-800/40 bg-red-900/10"}`}>
+              <div className={`rounded-xl border p-4 space-y-3 ${margin >= 0 ? "border-green-300 bg-green-50" : "border-red-800/40 bg-red-900/10"}`}>
                 <p className="text-sm font-medium text-foreground">Confirmar aprovação</p>
-                <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg ${margin >= 0 ? "bg-green-900/20" : "bg-red-900/20"}`}>
-                  <span className={`text-xs font-mono ${margin >= 0 ? "text-green-400" : "text-red-400"}`}>Margem do contrato</span>
-                  <span className={`text-sm font-mono font-bold ${margin >= 0 ? "text-green-400" : "text-red-400"}`}>{margin.toFixed(1)}%</span>
+                <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg ${margin >= 0 ? "bg-green-100" : "bg-red-900/20"}`}>
+                  <span className={`text-xs font-mono ${margin >= 0 ? "text-green-700" : "text-red-400"}`}>Margem do contrato</span>
+                  <span className={`text-sm font-mono font-bold ${margin >= 0 ? "text-green-700" : "text-red-400"}`}>{margin.toFixed(1)}%</span>
                 </div>
                 {margin < 0 && (
-                  <p className="text-xs text-red-400 leading-snug">Atenção: a margem está negativa. Verifique os valores antes de aprovar.</p>
+                  <p className="text-xs text-red-600 leading-snug">Atenção: a margem está negativa. Verifique os valores antes de aprovar.</p>
                 )}
                 <p className="text-sm text-muted-foreground">Deseja aprovar este orçamento?</p>
                 <div className="flex gap-2">
