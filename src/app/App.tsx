@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/react/daygrid";
+import timeGridPlugin from "@fullcalendar/react/timegrid";
+import multiMonthPlugin from "@fullcalendar/react/multimonth";
 import listPlugin from "@fullcalendar/react/list";
-import classicThemePlugin from "@fullcalendar/react/themes/classic";
+import monarchThemePlugin from "@fullcalendar/react/themes/monarch";
 import ptBrLocale from "@fullcalendar/react/locales/pt-br";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -1721,175 +1723,119 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
               .map(e => ({ title: e.description, start: e.dueDate!, color: "#F59E0B", extendedProps: { typeLabel: "Pagamento" } })),
           ];
 
-          const sortedList = [...calEvents]
-            .map(e => ({ ...e, dateObj: new Date(e.start + "T12:00:00") }))
-            .filter(e => !isNaN(e.dateObj.getTime()))
-            .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
-
           return (
-            <div className="p-4 space-y-5">
-              {/* FullCalendar */}
-              <div className="fc-cronograma overflow-hidden rounded-xl border border-border bg-card">
+            <div className="p-4">
+              <div className="fc-cronograma overflow-hidden rounded-xl border border-border bg-card p-2 sm:p-3">
                 <style>{`
-                  /* ─── CSS variables (colors) ──────────────────────────────── */
+                  /* Paleta Monarch mapeada para as cores do projeto (formas 100% do tema) */
                   .fc-cronograma {
-                    --fc-classic-button: #f5f4f1;
-                    --fc-classic-button-border: #dedad4;
-                    --fc-classic-button-foreground: #44403c;
-                    --fc-classic-button-strong: #1C2B3A;
-                    --fc-classic-button-strong-border: #1C2B3A;
-                    --fc-classic-primary: #D97706;
-                    --fc-classic-primary-foreground: #fff;
-                    --fc-classic-today: rgba(217,119,6,0.09);
-                    --fc-classic-background: transparent;
-                    --fc-classic-border: #e8e5df;
-                    --fc-classic-foreground: #1C1917;
-                    --fc-classic-faint: #f7f6f3;
-                    --fc-classic-faint-foreground: #a8a29e;
-                    --fc-classic-muted: #f0ede8;
-                    --fc-classic-muted-foreground: #78716C;
-                    --fc-classic-ring-color: rgba(217,119,6,0.28);
+                    /* primary — botões/eventos principais (navy do projeto) */
+                    --fc-monarch-primary: #1C2B3A;
+                    --fc-monarch-primary-foreground: #ffffff;
+                    --fc-monarch-primary-over: #2A3D50;
+                    --fc-monarch-primary-down: #385064;
+
+                    /* secondary — botão "Hoje" (stone claro) */
+                    --fc-monarch-secondary: #f5f4f1;
+                    --fc-monarch-secondary-foreground: #44403c;
+                    --fc-monarch-secondary-over: #edeae4;
+                    --fc-monarch-secondary-down: #e4e1da;
+
+                    /* tertiary — âmbar do projeto */
+                    --fc-monarch-tertiary: #D97706;
+                    --fc-monarch-tertiary-foreground: #ffffff;
+                    --fc-monarch-tertiary-over: #c26a05;
+                    --fc-monarch-tertiary-down: #ad5f05;
+
+                    /* conteúdo do calendário */
+                    --fc-monarch-event: var(--fc-monarch-primary);
+                    --fc-monarch-event-contrast: var(--fc-monarch-primary-foreground);
+                    --fc-monarch-highlight: rgba(217,119,6,0.08);
+                    --fc-monarch-now: #D97706;
+
+                    /* controles (aba de view selecionada) */
+                    --fc-monarch-selected: #1C2B3A;
+                    --fc-monarch-selected-foreground: #ffffff;
+                    --fc-monarch-selected-over: #2A3D50;
+                    --fc-monarch-selected-down: #385064;
+                    --fc-monarch-outline: #D97706;
+
+                    /* popover */
+                    --fc-monarch-popover: #ffffff;
+
+                    /* neutros (base stone do projeto) */
+                    --fc-monarch-background: #ffffff;
+                    --fc-monarch-faint: rgba(120,113,108,0.10);
+                    --fc-monarch-muted: rgba(120,113,108,0.15);
+                    --fc-monarch-strong: rgba(120,113,108,0.30);
+                    --fc-monarch-stronger: rgba(120,113,108,0.35);
+                    --fc-monarch-strongest: rgba(120,113,108,0.40);
+                    --fc-monarch-foreground: #1C1917;
+                    --fc-monarch-faint-foreground: #a8a29e;
+                    --fc-monarch-muted-foreground: #78716C;
+                    --fc-monarch-border: #e8e5df;
+                    --fc-monarch-strong-border: #d6d3cd;
                   }
-                  /* ─── Toolbar: nowrap, padding ────────────────────────────── */
-                  .fc-cronograma div:has(> div:has(> [role="heading"])) {
-                    padding: 9px 12px !important;
-                    flex-wrap: nowrap !important;
-                    align-items: center !important;
-                    gap: 6px !important;
-                  }
-                  .fc-cronograma div:has(> [role="heading"]) {
-                    flex: 1 1 0% !important;
-                    justify-content: center !important;
-                    min-width: 0 !important;
-                  }
-                  /* ─── Month/year heading ──────────────────────────────────── */
-                  .fc-cronograma [role="heading"] {
-                    font-size: 13px !important;
-                    font-weight: 600 !important;
-                    letter-spacing: -0.01em !important;
-                    white-space: nowrap !important;
-                    overflow: hidden !important;
-                    text-overflow: ellipsis !important;
-                  }
-                  /* ─── All toolbar buttons ─────────────────────────────────── */
-                  .fc-cronograma button[type="button"] {
-                    padding: 4px 9px !important;
-                    font-size: 12px !important;
-                    font-weight: 500 !important;
-                    line-height: 1.5 !important;
-                    border-radius: 7px !important;
-                    letter-spacing: 0 !important;
-                    box-shadow: none !important;
-                    outline: none !important;
-                    white-space: nowrap !important;
-                  }
-                  .fc-cronograma button[type="button"]:focus {
-                    box-shadow: 0 0 0 2px rgba(217,119,6,0.28) !important;
-                  }
-                  .fc-cronograma button[type="button"] svg {
-                    width: 14px !important;
-                    height: 14px !important;
-                  }
-                  /* View toggle tabs */
-                  .fc-cronograma [role="tab"] {
-                    padding: 4px 10px !important;
-                    font-size: 12px !important;
-                    border-radius: 0 !important;
-                  }
-                  /* ─── Day column headers ──────────────────────────────────── */
-                  .fc-cronograma [role="columnheader"] {
-                    padding: 4px 2px !important;
-                    font-size: 10.5px !important;
-                    font-weight: 500 !important;
-                    letter-spacing: 0.05em !important;
-                    text-transform: uppercase !important;
-                    color: #78716C !important;
-                  }
-                  .fc-cronograma [role="columnheader"] a {
-                    text-decoration: none !important;
-                    color: inherit !important;
-                    cursor: default !important;
-                    pointer-events: none !important;
-                  }
-                  /* ─── Day numbers ─────────────────────────────────────────── */
-                  .fc-cronograma [role="gridcell"] a:not([role="button"]) {
-                    font-size: 11px !important;
-                    text-decoration: none !important;
-                    padding: 2px 4px !important;
-                    color: #57534e !important;
-                    cursor: default !important;
-                    pointer-events: none !important;
-                  }
-                  /* ─── Dark mode ───────────────────────────────────────────── */
-                  @media (prefers-color-scheme: dark) {
-                    .fc-cronograma {
-                      --fc-classic-button: #2a2520;
-                      --fc-classic-button-border: #3d3830;
-                      --fc-classic-button-foreground: #c8c4be;
-                      --fc-classic-button-strong: #D97706;
-                      --fc-classic-button-strong-border: #D97706;
-                      --fc-classic-border: #3d3830;
-                      --fc-classic-foreground: #f5f4f1;
-                      --fc-classic-faint: #1e1a17;
-                      --fc-classic-faint-foreground: #5a5550;
-                      --fc-classic-muted: #252018;
-                      --fc-classic-muted-foreground: #a09890;
-                      --fc-classic-today: rgba(217,119,6,0.13);
+                  /* Mobile: compacta toolbar do tema para caber em 375px (mesmas formas, tamanhos menores) */
+                  @media (max-width: 640px) {
+                    .fc-cronograma div:has(> [role="heading"]) {
+                      min-width: 0 !important;
+                      flex-shrink: 1 !important;
+                      overflow: hidden !important;
                     }
-                    .fc-cronograma [role="columnheader"] { color: #807870 !important; }
-                    .fc-cronograma [role="gridcell"] a:not([role="button"]) { color: #9a9490 !important; }
+                    .fc-cronograma [role="heading"] {
+                      font-size: 15px !important;
+                      white-space: nowrap !important;
+                      overflow: hidden !important;
+                      text-overflow: ellipsis !important;
+                      min-width: 0 !important;
+                      max-width: 100% !important;
+                    }
+                    .fc-cronograma button[type="button"] {
+                      font-size: 12px !important;
+                      padding-left: 10px !important;
+                      padding-right: 10px !important;
+                      min-height: 32px !important;
+                    }
+                    .fc-cronograma [role="tab"] {
+                      font-size: 12px !important;
+                      padding-left: 9px !important;
+                      padding-right: 9px !important;
+                      min-height: 30px !important;
+                    }
+                    .fc-cronograma button[type="button"] svg {
+                      width: 16px !important;
+                      height: 16px !important;
+                    }
+                    /* Lista: fonte menor e quebra de linha só no título do evento */
+                    .fc-cronograma [role="listitem"] {
+                      font-size: 13px !important;
+                    }
+                    .fc-cronograma [role="listitem"] > div:last-child > div > div:last-child > div:last-child {
+                      white-space: normal !important;
+                      overflow-wrap: break-word;
+                      font-size: 13px !important;
+                    }
+                    /* célula "Dia inteiro": menor e sem largura fixa, para liberar espaço ao título */
+                    .fc-cronograma [role="listitem"] > div:last-child > div > div:last-child > div:first-child {
+                      font-size: 11px !important;
+                      width: auto !important;
+                    }
                   }
-                  :root[data-theme="dark"] .fc-cronograma {
-                    --fc-classic-button: #2a2520;
-                    --fc-classic-button-border: #3d3830;
-                    --fc-classic-button-foreground: #c8c4be;
-                    --fc-classic-button-strong: #D97706;
-                    --fc-classic-button-strong-border: #D97706;
-                    --fc-classic-border: #3d3830;
-                    --fc-classic-foreground: #f5f4f1;
-                    --fc-classic-faint: #1e1a17;
-                    --fc-classic-faint-foreground: #5a5550;
-                    --fc-classic-muted: #252018;
-                    --fc-classic-muted-foreground: #a09890;
-                    --fc-classic-today: rgba(217,119,6,0.13);
-                  }
-                  :root[data-theme="dark"] .fc-cronograma [role="columnheader"] { color: #807870 !important; }
-                  :root[data-theme="dark"] .fc-cronograma [role="gridcell"] a:not([role="button"]) { color: #9a9490 !important; }
                 `}</style>
                 <FullCalendar
-                  plugins={[dayGridPlugin, listPlugin, classicThemePlugin]}
+                  plugins={[dayGridPlugin, timeGridPlugin, multiMonthPlugin, listPlugin, monarchThemePlugin]}
                   locale={ptBrLocale}
                   initialView="dayGridMonth"
                   initialDate={toISO(localStartDate) ?? undefined}
-                  headerToolbar={{ left: "prev,next", center: "title", right: "dayGridMonth,listMonth" }}
+                  headerToolbar={{
+                    left: "today prev,next title",
+                    right: "dayGridMonth,timeGridWeek,timeGridDay,listMonth,multiMonthYear",
+                  }}
                   height="auto"
                   events={calEvents}
-                  eventDisplay="block"
                 />
               </div>
-
-              {/* Timeline list */}
-              {sortedList.length > 0 && (
-                <div className="bg-card border border-border rounded-xl overflow-hidden">
-                  <div className="px-4 py-3 border-b border-border">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Todos os eventos</p>
-                  </div>
-                  <div className="divide-y divide-border">
-                    {sortedList.map((ev, i) => (
-                      <div key={i} className="flex items-center gap-3 px-4 py-2.5">
-                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: ev.color ?? "#94A3B8" }} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-foreground truncate">{ev.title}</p>
-                          <p className="text-[10px] text-muted-foreground">{ev.extendedProps?.typeLabel}</p>
-                        </div>
-                        <span className="text-xs font-mono text-muted-foreground shrink-0">
-                          {ev.dateObj.toLocaleDateString("pt-BR")}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           );
         })()}
