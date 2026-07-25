@@ -56,6 +56,8 @@ export interface QuoteRecord {
   analysisStartedAt?: string;
   history: QuoteHistoryEntry[];
   createdAt: string;
+  /** ID da obra gerada a partir deste orçamento. Uma vez definido, o orçamento fica travado (não pode mais ser editado). */
+  generatedProjectId?: number;
 }
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
@@ -88,7 +90,7 @@ export interface MilestoneMaterial {
 }
 
 export interface Milestone {
-  id?: number;
+  id: number;
   label: string;
   done: boolean;
   date: string;
@@ -114,7 +116,7 @@ export interface ProjectHistoryEntry {
 }
 
 export interface ProjectPhoto {
-  id?: number;
+  id: number;
   url: string;
   caption: string;
   date: string;
@@ -131,6 +133,8 @@ export interface ProjectDocument {
 
 export interface Project {
   id: number;
+  /** ID do orçamento que originou esta obra — vincula obra ↔ orçamento. */
+  quoteId?: number;
   name: string;
   client: string;
   status: ProjectStatus;

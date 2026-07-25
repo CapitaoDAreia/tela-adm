@@ -1036,10 +1036,12 @@ function DocumentosTab({
   documents,
   onAdd,
   onRemove,
+  readOnly = false,
 }: {
   documents: ProjectDocument[];
   onAdd: (doc: ProjectDocument) => void;
   onRemove: (id: number) => void;
+  readOnly?: boolean;
 }) {
   const [uploading, setUploading] = useState(false);
   const [docTitle, setDocTitle] = useState("");
@@ -1099,21 +1101,23 @@ function DocumentosTab({
                 >
                   <Upload size={13} className="rotate-180" />
                 </a>
-                <button
-                  type="button"
-                  onClick={() => onRemove(doc.id)}
-                  className="p-1.5 rounded hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors"
-                  title="Remover"
-                >
-                  <Trash2 size={13} />
-                </button>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => onRemove(doc.id)}
+                    className="p-1.5 rounded hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors"
+                    title="Remover"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {uploading ? (
+      {readOnly ? null : uploading ? (
         <div className="bg-card border border-accent/30 rounded-xl p-4 space-y-3">
           <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide">Novo documento</p>
           <input
@@ -1196,6 +1200,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
 }) {
   const [tab, setTab] = useState<DetailTab>("visao");
   const [status, setStatus] = useState<ProjectStatus>(project.status);
+  const isLocked = status === "Cancelada";
   const [milestones, setMilestones] = useState<Milestone[]>(project.milestones);
   const [expenses, setExpenses] = useState<Expense[]>(project.expenses);
   const [photos, setPhotos] = useState(project.photos);
@@ -1283,10 +1288,13 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
   const hasPendingPayments = expenses.some(e => e.isPayment && e.paymentStatus === "A fazer");
   const canConclude = allConcluded && !hasPendingPayments;
 
+  const wasCancelled = status === "Cancelada";
+
   const handleProjectAction = () => {
     if (!projectAction) return;
     let newStatus: ProjectStatus;
     let historyMsg: string;
+    let nextCancelReason: string | undefined = project.cancelReason;
     if (projectAction === "concluir") {
       newStatus = "Concluído";
       historyMsg = "Obra concluída.";
@@ -1295,13 +1303,17 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
       historyMsg = projectActionReason.trim() ? `Obra pausada — ${projectActionReason.trim()}` : "Obra pausada.";
     } else if (projectAction === "retomar") {
       newStatus = "Em andamento";
-      historyMsg = "Obra retomada.";
+      historyMsg = wasCancelled
+        ? `Obra retomada após cancelamento — Motivo: ${projectActionReason.trim()}`
+        : "Obra retomada.";
+      nextCancelReason = undefined;
     } else {
       newStatus = "Cancelada";
-      historyMsg = projectActionReason.trim() ? `Obra cancelada — ${projectActionReason.trim()}` : "Obra cancelada.";
+      historyMsg = `Obra cancelada — Motivo: ${projectActionReason.trim()}`;
+      nextCancelReason = projectActionReason.trim();
     }
     const updated = addProjectHistory(
-      { ...project, milestones, expenses, status: newStatus, progress: computedProgress, phase: computedPhase, cancelReason: projectActionReason.trim() || undefined },
+      { ...project, milestones, expenses, status: newStatus, progress: computedProgress, phase: computedPhase, cancelReason: nextCancelReason },
       historyMsg
     );
     onUpdateProject?.(updated);
@@ -1312,7 +1324,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
   const [showReport, setShowReport] = useState(false);
 
   const emptyStep: Milestone = {
-    label: "", done: false, date: "", status: "Pendente",
+    id: 0, label: "", done: false, date: "", status: "Pendente",
     description: "", startDate: "", deadline: "", completedAt: "", photos: [],
   };
 
@@ -1434,6 +1446,20 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
       </div>
 
       <div className="px-4 py-5 max-w-2xl mx-auto pb-40">
+        {isLocked && (
+          <div className="mb-4 bg-red-900/10 border border-red-900/30 rounded-xl px-4 py-3 flex items-start gap-2.5">
+            <Ban size={16} className="text-red-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-red-500">Obra cancelada</p>
+              {project.cancelReason && (
+                <p className="text-xs text-muted-foreground mt-0.5">Motivo: {project.cancelReason}</p>
+              )}
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Esta obra está bloqueada para edições — apenas consulta. Use "Retomar obra" abaixo para reativá-la.
+              </p>
+            </div>
+          </div>
+        )}
         {/* TAB: Visão Geral */}
         {tab === "visao" && (
           <div className="space-y-5">
@@ -1500,7 +1526,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
             <div className="bg-card border border-border rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs text-muted-foreground font-mono">Datas</p>
-                {!adjustingDates && (
+                {!adjustingDates && !isLocked && (
                   <button
                     type="button"
                     onClick={() => setAdjustingDates(true)}
@@ -1602,6 +1628,15 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                     </div>
                     <span className="text-sm font-mono font-medium text-foreground">{localEndDate}</span>
                   </div>
+                  {project.quoteId && (
+                    <div className="flex items-center justify-between pt-2 border-t border-border/60">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <ClipboardList size={14} className="text-accent" />
+                        <span>Orçamento de origem</span>
+                      </div>
+                      <span className="text-sm font-mono font-medium text-foreground">#{project.quoteId}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1680,13 +1715,15 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                   );
                 })}
               </div>
-              <button
-                type="button"
-                onClick={() => setCreatingStep(true)}
-                className="flex items-center gap-1.5 text-xs font-medium text-accent hover:text-amber-600 transition-colors shrink-0"
-              >
-                <Plus size={14} /> Nova etapa
-              </button>
+              {!isLocked && (
+                <button
+                  type="button"
+                  onClick={() => setCreatingStep(true)}
+                  className="flex items-center gap-1.5 text-xs font-medium text-accent hover:text-amber-600 transition-colors shrink-0"
+                >
+                  <Plus size={14} /> Nova etapa
+                </button>
+              )}
             </div>
 
             {milestones.map((m, i) => {
@@ -1701,8 +1738,9 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
               return (
                 <button
                   key={i}
-                  onClick={() => setEditingStep(m)}
-                  className={`w-full bg-card border rounded-xl px-4 py-3.5 flex items-center gap-3 text-left hover:border-accent/40 transition-colors group ${isOverdue ? "border-red-200" : "border-border"}`}
+                  onClick={() => !isLocked && setEditingStep(m)}
+                  disabled={isLocked}
+                  className={`w-full bg-card border rounded-xl px-4 py-3.5 flex items-center gap-3 text-left transition-colors group ${isOverdue ? "border-red-200" : "border-border"} ${isLocked ? "cursor-default" : "hover:border-accent/40"}`}
                 >
                   <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.dot}`} />
                   <div className="flex-1 min-w-0">
@@ -1938,12 +1976,14 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                 <span className="text-sm font-mono font-semibold text-foreground">
                   {fmt(expenses.reduce((s, e) => s + e.amount, 0))}
                 </span>
-                <button
-                  onClick={() => setAddingExpense(true)}
-                  className="flex items-center gap-1 text-xs font-medium text-accent hover:text-amber-600 transition-colors"
-                >
-                  <Plus size={14} /> Adicionar
-                </button>
+                {!isLocked && (
+                  <button
+                    onClick={() => setAddingExpense(true)}
+                    className="flex items-center gap-1 text-xs font-medium text-accent hover:text-amber-600 transition-colors"
+                  >
+                    <Plus size={14} /> Adicionar
+                  </button>
+                )}
               </div>
             </div>
             {expenses.map(exp => (
@@ -1971,17 +2011,19 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                   {exp.notes && <p className="text-[10px] text-muted-foreground/70 mt-0.5 truncate">{exp.notes}</p>}
                 </div>
                 <p className="text-sm font-mono font-semibold text-foreground shrink-0">{fmt(exp.amount)}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingExpenseId(exp.id);
-                    setExpenseDraft({ description: exp.description, category: exp.category, amount: String(exp.amount), notes: exp.notes ?? "", isPayment: exp.isPayment ?? false, paymentStatus: exp.paymentStatus ?? "A fazer", dueDate: exp.dueDate ?? "" });
-                    setAddingExpense(true);
-                  }}
-                  className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground shrink-0"
-                >
-                  <Pencil size={13} />
-                </button>
+                {!isLocked && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingExpenseId(exp.id);
+                      setExpenseDraft({ description: exp.description, category: exp.category, amount: String(exp.amount), notes: exp.notes ?? "", isPayment: exp.isPayment ?? false, paymentStatus: exp.paymentStatus ?? "A fazer", dueDate: exp.dueDate ?? "" });
+                      setAddingExpense(true);
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground shrink-0"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -2022,13 +2064,13 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
               onChange={e => {
                 const files = Array.from(e.target.files || []);
                 const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-                files.forEach(file => {
+                files.forEach((file, i) => {
                   const reader = new FileReader();
                   reader.onload = ev => {
                     const url = ev.target?.result as string;
                     const now = new Date();
                     const dateStr = `${String(now.getDate()).padStart(2,"0")} ${months[now.getMonth()]} ${now.getFullYear()}`;
-                    const newPhoto = { url, caption: file.name.replace(/\.[^.]+$/, ""), date: dateStr };
+                    const newPhoto = { id: Date.now() + i, url, caption: file.name.replace(/\.[^.]+$/, ""), date: dateStr };
                     setPhotos(prev => {
                       const next = [...prev, newPhoto];
                       const updatedProject = addProjectHistory(
@@ -2044,13 +2086,15 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                 e.target.value = "";
               }}
             />
-            <button
-              type="button"
-              onClick={() => document.getElementById("gallery-upload-input")?.click()}
-              className="w-full py-3 border-2 border-dashed border-border rounded-xl text-sm text-muted-foreground hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2"
-            >
-              <Upload size={16} /> Adicionar Fotos
-            </button>
+            {!isLocked && (
+              <button
+                type="button"
+                onClick={() => document.getElementById("gallery-upload-input")?.click()}
+                className="w-full py-3 border-2 border-dashed border-border rounded-xl text-sm text-muted-foreground hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2"
+              >
+                <Upload size={16} /> Adicionar Fotos
+              </button>
+            )}
           </div>
         )}
 
@@ -2058,6 +2102,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
         {tab === "documentos" && (
           <DocumentosTab
             documents={documents}
+            readOnly={isLocked}
             onAdd={doc => {
               const next = [...documents, doc];
               setDocuments(next);
@@ -2154,8 +2199,50 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
         </div>
       )}
 
-      {/* Ações da obra (Concluir / Pausar / Cancelar) */}
-      {status !== "Concluído" && status !== "Cancelada" && (
+      {/* Ações da obra — obra cancelada só tem "Retomar" (com motivo obrigatório) */}
+      {status === "Cancelada" ? (
+        <div className="fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-sm border-t border-border px-4 py-3">
+          {projectAction === "retomar" ? (
+            <div className="max-w-2xl mx-auto space-y-3">
+              <p className="text-sm font-medium text-foreground">Confirmar retomada da obra?</p>
+              <textarea
+                rows={2}
+                placeholder="Motivo da retomada (obrigatório)"
+                value={projectActionReason}
+                onChange={e => setProjectActionReason(e.target.value)}
+                className="w-full bg-input-background rounded-lg px-3 py-2 text-sm border border-border text-foreground placeholder:text-muted-foreground/50 outline-none focus:ring-2 ring-accent/40 resize-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setProjectAction(null); setProjectActionReason(""); }}
+                  className="flex-1 py-2.5 bg-muted text-muted-foreground rounded-xl text-sm font-medium hover:bg-secondary transition-colors"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleProjectAction}
+                  disabled={!projectActionReason.trim()}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  <RotateCcw size={15} /> Retomar obra
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="max-w-2xl mx-auto">
+              <button
+                type="button"
+                onClick={() => setProjectAction("retomar")}
+                className="w-full py-2.5 bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-sm font-medium hover:bg-blue-200 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <RotateCcw size={14} /> Retomar obra
+              </button>
+            </div>
+          )}
+        </div>
+      ) : status !== "Concluído" && (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-sm border-t border-border px-4 py-3">
           {projectAction ? (
             <div className="max-w-2xl mx-auto space-y-3">
@@ -2165,13 +2252,22 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                 {projectAction === "cancelar" && "Confirmar cancelamento da obra?"}
                 {projectAction === "retomar" && "Confirmar retomada da obra?"}
               </p>
-              {(projectAction === "pausar" || projectAction === "cancelar") && (
+              {projectAction === "pausar" && (
                 <input
                   type="text"
-                  placeholder={projectAction === "cancelar" ? "Motivo do cancelamento (opcional)" : "Motivo da pausa (opcional)"}
+                  placeholder="Motivo da pausa (opcional)"
                   value={projectActionReason}
                   onChange={e => setProjectActionReason(e.target.value)}
                   className="w-full bg-input-background rounded-lg px-3 py-2 text-sm border border-border text-foreground placeholder:text-muted-foreground/50 outline-none focus:ring-2 ring-accent/40"
+                />
+              )}
+              {projectAction === "cancelar" && (
+                <textarea
+                  rows={2}
+                  placeholder="Motivo do cancelamento (obrigatório)"
+                  value={projectActionReason}
+                  onChange={e => setProjectActionReason(e.target.value)}
+                  className="w-full bg-input-background rounded-lg px-3 py-2 text-sm border border-border text-foreground placeholder:text-muted-foreground/50 outline-none focus:ring-2 ring-accent/40 resize-none"
                 />
               )}
               {projectAction === "concluir" && !allConcluded && (
@@ -2191,7 +2287,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                 <button
                   type="button"
                   onClick={handleProjectAction}
-                  disabled={projectAction === "concluir" && !canConclude}
+                  disabled={(projectAction === "concluir" && !canConclude) || (projectAction === "cancelar" && !projectActionReason.trim())}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-2 ${
                     projectAction === "concluir" ? "bg-green-600 text-white hover:bg-green-700"
                     : projectAction === "pausar" ? "bg-yellow-500 text-white hover:bg-yellow-600"
@@ -2296,7 +2392,8 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
           projectEndDate={localEndDate}
           projectBudgeted={project.budgeted}
           projectSpent={totalExpenses}
-          onSave={newStep => {
+          onSave={draftStep => {
+            const newStep: Milestone = { ...draftStep, id: Date.now() };
             const next = [...milestones, newStep];
             setMilestones(next);
             const newExpenses = contractorExpenseForMilestone(newStep, expenses);
@@ -3086,6 +3183,8 @@ function QuotesList({ quotes, onOpenQuote }: { quotes: QuoteRecord[]; onOpenQuot
                 )}
                 {/* Row 3: urgency + items + created */}
                 <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[10px] font-mono text-muted-foreground/70">#{q.id}</span>
+                  <span className="text-muted-foreground/40 text-[10px]">·</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${urgencyColors[q.urgency] ?? "bg-gray-100 text-gray-600"}`}>
                     {q.urgency}
                   </span>
@@ -3146,6 +3245,7 @@ function QuoteDetail({
   const [datesAdjustReason, setDatesAdjustReason] = useState("");
 
   const isReadOnly = quote.status !== "Em análise";
+  const missingDatesForApproval = !quote.startDate || !quote.endDate;
 
   const currentBudgeted = quote.items.reduce((s, i) => s + (parseFloat(i.amount.replace(/\./g, "").replace(",", ".")) || 0), 0);
   const margin = quote.contractValue > 0
@@ -3207,6 +3307,7 @@ function QuoteDetail({
   };
 
   const handleApprove = () => {
+    if (!quote.startDate || !quote.endDate) return;
     const ts = nowTs();
     const updated = addHistory({ ...quote, status: "Aprovado", quoteDeadline: ts }, "Orçamento aprovado.");
     onUpdateQuote(updated);
@@ -3237,7 +3338,7 @@ function QuoteDetail({
           <ArrowLeft size={18} />
         </button>
         <div>
-          <p className="text-xs text-primary-foreground/60 font-mono uppercase tracking-wider">Orçamento</p>
+          <p className="text-xs text-primary-foreground/60 font-mono uppercase tracking-wider">Orçamento #{quote.id}</p>
           <h1 className="text-base font-semibold" style={{ fontFamily: "'DM Serif Display', serif" }}>{quote.clientName}</h1>
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -3390,13 +3491,26 @@ function QuoteDetail({
                 </div>
               </div>
             ) : (
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setCancellingQuote(true)} className="flex-1 py-2.5 bg-muted text-muted-foreground rounded-xl text-sm font-medium hover:bg-secondary transition-colors border border-border">
-                  Cancelar orçamento
-                </button>
-                <button type="button" onClick={() => setConfirmingApproval(true)} className="flex-1 py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
-                  <CheckCircle size={15} /> Aprovar
-                </button>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setCancellingQuote(true)} className="flex-1 py-2.5 bg-muted text-muted-foreground rounded-xl text-sm font-medium hover:bg-secondary transition-colors border border-border">
+                    Cancelar orçamento
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingApproval(true)}
+                    disabled={missingDatesForApproval}
+                    title={missingDatesForApproval ? "Defina as datas de início e entrega antes de aprovar." : undefined}
+                    className="flex-1 py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none disabled:hover:bg-green-600"
+                  >
+                    <CheckCircle size={15} /> Aprovar
+                  </button>
+                </div>
+                {missingDatesForApproval && (
+                  <p className="text-xs text-amber-600 leading-snug">
+                    Defina a data de início e a entrega prevista (seção "Ajustar datas" abaixo) antes de aprovar este orçamento.
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -3742,24 +3856,36 @@ function QuoteDetail({
           </div>
         </div>
 
-        {/* Gerar Obra — só aparece quando Aprovado e ainda não gerou obra */}
+        {/* Gerar Obra — só aparece quando Aprovado */}
         {quote.status === "Aprovado" && (
-          <div className="bg-green-900/10 border border-green-800/30 rounded-xl p-4 space-y-3">
-            <p className="text-xs text-green-400 font-mono uppercase tracking-wide font-medium">Orçamento aprovado</p>
-            <p className="text-sm text-muted-foreground">Pronto para iniciar. Clique abaixo para criar a obra no sistema.</p>
-            <button
-              onClick={() => onGenerateProject(quote)}
-              className="w-full py-3 bg-accent text-accent-foreground rounded-xl font-medium hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 text-sm"
-            >
-              <HardHat size={16} /> Gerar Obra
-            </button>
-            <button
-              onClick={handleReopenAnalysis}
-              className="w-full py-2.5 bg-transparent border border-border text-muted-foreground rounded-xl text-sm font-medium hover:border-accent/50 hover:text-foreground transition-colors flex items-center justify-center gap-2"
-            >
-              <RotateCcw size={14} /> Reabrir para análise
-            </button>
-          </div>
+          quote.generatedProjectId ? (
+            <div className="bg-muted/60 border border-border rounded-xl p-4 space-y-2">
+              <p className="text-xs text-muted-foreground font-mono uppercase tracking-wide font-medium flex items-center gap-1.5">
+                <ShieldCheck size={13} className="text-accent" /> Orçamento travado
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Obra já gerada a partir deste orçamento (obra <span className="font-mono text-foreground">#{quote.generatedProjectId}</span>).
+                Este orçamento não pode mais ser editado ou reaberto.
+              </p>
+            </div>
+          ) : (
+            <div className="bg-green-900/10 border border-green-800/30 rounded-xl p-4 space-y-3">
+              <p className="text-xs text-green-400 font-mono uppercase tracking-wide font-medium">Orçamento aprovado</p>
+              <p className="text-sm text-muted-foreground">Pronto para iniciar. Clique abaixo para criar a obra no sistema.</p>
+              <button
+                onClick={() => onGenerateProject(quote)}
+                className="w-full py-3 bg-accent text-accent-foreground rounded-xl font-medium hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 text-sm"
+              >
+                <HardHat size={16} /> Gerar Obra
+              </button>
+              <button
+                onClick={handleReopenAnalysis}
+                className="w-full py-2.5 bg-transparent border border-border text-muted-foreground rounded-xl text-sm font-medium hover:border-accent/50 hover:text-foreground transition-colors flex items-center justify-center gap-2"
+              >
+                <RotateCcw size={14} /> Reabrir para análise
+              </button>
+            </div>
+          )
         )}
       </div>
     </div>
@@ -4223,8 +4349,10 @@ export default function App() {
   };
 
   const handleGenerateProject = (q: QuoteRecord) => {
+    if (q.generatedProjectId) return; // orçamento já gerou obra — travado
     const lastName = q.clientName.split(" ").pop() ?? q.clientName;
     const payload: Omit<Project, "id"> = {
+      quoteId: q.id,
       name: `Studio ${lastName}`,
       client: q.clientName,
       status: "Em andamento",
@@ -4233,7 +4361,8 @@ export default function App() {
       contractValue: q.contractValue,
       spent: 0,
       expenses: [],
-      milestones: q.items.map(item => ({
+      milestones: q.items.map((item, i) => ({
+        id: Date.now() + i,
         label: item.title,
         done: false,
         date: "",
@@ -4251,11 +4380,18 @@ export default function App() {
       startDate: q.startDate || "–",
       endDate: q.endDate || "–",
       quoteDeadline: q.quoteDeadline ?? "",
-      history: [{ datetime: nowTs(), description: `Obra criada a partir do orçamento aprovado de ${q.clientName}.` }],
+      history: [{ datetime: nowTs(), description: `Obra criada a partir do orçamento aprovado de ${q.clientName} (orçamento #${q.id}).` }],
     };
     projectsApi.create(payload)
       .then(created => {
         setProjects(prev => [...prev, created]);
+        const updatedQuote: QuoteRecord = {
+          ...q,
+          generatedProjectId: created.id,
+          history: [...(q.history ?? []), { datetime: nowTs(), description: `Obra gerada a partir deste orçamento (obra #${created.id}). Orçamento travado para edição.` }],
+        };
+        setQuotes(prev => prev.map(qq => qq.id === q.id ? updatedQuote : qq));
+        quotesApi.update(q.id, updatedQuote).catch(e => console.error("Failed to lock quote after project generation:", e));
         setScreen("dashboard");
       })
       .catch(e => console.error("Failed to generate project:", e));
