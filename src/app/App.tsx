@@ -32,6 +32,50 @@ const fmt = (n: number) =>
 const fmtDate = (d: string) =>
   d && d.includes("-") ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR") : d;
 
+const nowTs = () => {
+  const d = new Date();
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+};
+
+function describeMilestoneChanges(before: Milestone, after: Milestone): string[] {
+  const notes: string[] = [];
+  if (before.status !== after.status) {
+    notes.push(`status alterado de "${before.status}" para "${after.status}"`);
+  }
+  if (before.startDate !== after.startDate && after.startDate) {
+    notes.push(`início previsto alterado para ${fmtDate(after.startDate)}`);
+  }
+  if (before.deadline !== after.deadline && after.deadline) {
+    notes.push(`prazo alterado para ${fmtDate(after.deadline)}`);
+  }
+  if (before.contractorName !== after.contractorName) {
+    if (after.contractorName && !before.contractorName) {
+      notes.push(`empreiteiro "${after.contractorName}" atribuído`);
+    } else if (!after.contractorName && before.contractorName) {
+      notes.push(`empreiteiro "${before.contractorName}" removido`);
+    } else if (after.contractorName) {
+      notes.push(`empreiteiro alterado para "${after.contractorName}"`);
+    }
+  }
+  if (before.contractorValue !== after.contractorValue) {
+    notes.push(after.contractorValue != null
+      ? `valor do empreiteiro definido em ${fmt(after.contractorValue)}`
+      : `valor do empreiteiro removido`);
+  }
+  if (before.contractorPaymentDue !== after.contractorPaymentDue && after.contractorPaymentDue) {
+    notes.push(`vencimento do pagamento definido para ${fmtDate(after.contractorPaymentDue)}`);
+  }
+  if (before.description !== after.description) {
+    notes.push(`descrição da etapa atualizada`);
+  }
+  return notes;
+}
+
 const parseAnyDate = (d: string): Date | null => {
   if (!d) return null;
   if (d.includes("/")) {
@@ -500,12 +544,15 @@ const PHASE_TEMPLATES: { label: string; description: string }[] = [
   { label: "Acabamentos e entrega",        description: "Instalação de louças, metais, luminárias, rodapés e limpeza fina para entrega." },
 ];
 
-function StepModal({ step, onClose, onSave, isNew = false, projectStartDate }: {
+function StepModal({ step, onClose, onSave, isNew = false, projectStartDate, projectEndDate, projectBudgeted, projectSpent }: {
   step: Milestone;
   onClose: () => void;
   onSave: (updated: Milestone) => void;
   isNew?: boolean;
   projectStartDate?: string;
+  projectEndDate?: string;
+  projectBudgeted?: number;
+  projectSpent?: number;
 }) {
   const [draft, setDraft] = useState<Milestone>({ ...step });
   const [pickedTemplate, setPickedTemplate] = useState<string | null>(null);
@@ -596,6 +643,44 @@ function StepModal({ step, onClose, onSave, isNew = false, projectStartDate }: {
             <X size={16} />
           </button>
         </div>
+
+        {/* Contexto da obra — visível ao definir custo/datas da etapa */}
+        {(projectBudgeted != null || projectStartDate) && (
+          <div className="mx-5 mt-4 rounded-xl border border-border bg-muted/40 overflow-hidden">
+            <div className="px-4 py-2 border-b border-border bg-muted/60">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Contexto da obra</span>
+            </div>
+            <div className="px-4 py-3 space-y-2.5">
+              {projectBudgeted != null && (
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Orçado</p>
+                    <p className="text-xs font-mono font-semibold text-foreground">{fmt(projectBudgeted)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Gasto</p>
+                    <p className="text-xs font-mono font-semibold text-amber-600">{fmt(projectSpent ?? 0)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Saldo</p>
+                    <p className={`text-xs font-mono font-semibold ${projectBudgeted - (projectSpent ?? 0) >= 0 ? "text-green-600" : "text-red-500"}`}>
+                      {fmt(projectBudgeted - (projectSpent ?? 0))}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {projectStartDate && (
+                <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground font-mono pt-1 border-t border-border/60">
+                  <CalendarDays size={11} className="text-accent shrink-0" />
+                  {projectStartDate}
+                  <span className="text-muted-foreground/50">→</span>
+                  <CalendarCheck size={11} className="text-accent shrink-0" />
+                  {projectEndDate || "–"}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="px-5 py-4 space-y-5">
           {/* Templates de etapa (apenas se novo) */}
@@ -831,7 +916,7 @@ function StepModal({ step, onClose, onSave, isNew = false, projectStartDate }: {
                 )}
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1.5">Valor combinado</label>
+                <label className="text-xs font-medium text-muted-foreground block mb-1.5">Custo da etapa (valor combinado)</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
                   <input
@@ -1138,8 +1223,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
     return "Concluída";
   })();
 
-  const propagate = (newMilestones: Milestone[], overrideExpenses?: Expense[]) => {
-    const exp = overrideExpenses ?? expenses;
+  const computeDerived = (newMilestones: Milestone[]) => {
     const progress = newMilestones.length > 0
       ? Math.round(newMilestones.filter(m => m.status === "Concluído").length / newMilestones.length * 100)
       : project.progress;
@@ -1149,7 +1233,7 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
       : inProg ? inProg.label
       : next ? next.label
       : "Concluída";
-    onUpdateProject?.({ ...project, milestones: newMilestones, expenses: exp, status, progress, phase });
+    return { progress, phase };
   };
 
   const contractorExpenseForMilestone = (m: Milestone, currentExpenses: Expense[]): Expense[] => {
@@ -1650,6 +1734,11 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                           <HardHatIcon size={9} /> {m.contractorName}
                         </span>
                       )}
+                      {m.contractorValue != null && m.contractorValue > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border bg-muted text-foreground font-mono font-medium whitespace-nowrap">
+                          {fmt(m.contractorValue)}
+                        </span>
+                      )}
                     </div>
                   </div>
                   {/* Materiais pendentes */}
@@ -1942,7 +2031,11 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                     const newPhoto = { url, caption: file.name.replace(/\.[^.]+$/, ""), date: dateStr };
                     setPhotos(prev => {
                       const next = [...prev, newPhoto];
-                      onUpdateProject?.({ ...project, milestones, expenses, photos: next, status, progress: computedProgress, phase: computedPhase });
+                      const updatedProject = addProjectHistory(
+                        { ...project, milestones, expenses, photos: next, status, progress: computedProgress, phase: computedPhase },
+                        `Foto adicionada à galeria: "${newPhoto.caption}".`
+                      );
+                      onUpdateProject?.(updatedProject);
                       return next;
                     });
                   };
@@ -1968,12 +2061,21 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
             onAdd={doc => {
               const next = [...documents, doc];
               setDocuments(next);
-              onUpdateProject?.({ ...project, milestones, expenses, photos, status, progress: computedProgress, phase: computedPhase, documents: next });
+              const updatedProject = addProjectHistory(
+                { ...project, milestones, expenses, photos, status, progress: computedProgress, phase: computedPhase, documents: next },
+                `Documento "${doc.title}" adicionado.`
+              );
+              onUpdateProject?.(updatedProject);
             }}
             onRemove={id => {
+              const removed = documents.find(d => d.id === id);
               const next = documents.filter(d => d.id !== id);
               setDocuments(next);
-              onUpdateProject?.({ ...project, milestones, expenses, photos, status, progress: computedProgress, phase: computedPhase, documents: next });
+              const updatedProject = addProjectHistory(
+                { ...project, milestones, expenses, photos, status, progress: computedProgress, phase: computedPhase, documents: next },
+                removed ? `Documento "${removed.title}" removido.` : "Documento removido."
+              );
+              onUpdateProject?.(updatedProject);
             }}
           />
         )}
@@ -2161,13 +2263,25 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
         <StepModal
           step={editingStep}
           onClose={() => setEditingStep(null)}
-          projectStartDate={project.startDate}
+          projectStartDate={localStartDate}
+          projectEndDate={localEndDate}
+          projectBudgeted={project.budgeted}
+          projectSpent={totalExpenses}
           onSave={updated => {
             const next = milestones.map(m => m.label === editingStep.label ? updated : m);
             setMilestones(next);
             const newExpenses = contractorExpenseForMilestone(updated, expenses);
             if (newExpenses !== expenses) setExpenses(newExpenses);
-            propagate(next, newExpenses);
+            const changes = describeMilestoneChanges(editingStep, updated);
+            const desc = changes.length > 0
+              ? `Etapa "${updated.label}": ${changes.join("; ")}.`
+              : `Etapa "${updated.label}" atualizada.`;
+            const { progress, phase } = computeDerived(next);
+            const updatedProject = addProjectHistory(
+              { ...project, milestones: next, expenses: newExpenses, status, progress, phase },
+              desc
+            );
+            onUpdateProject?.(updatedProject);
           }}
         />
       )}
@@ -2178,13 +2292,27 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
           step={emptyStep}
           isNew
           onClose={() => setCreatingStep(false)}
-          projectStartDate={project.startDate}
+          projectStartDate={localStartDate}
+          projectEndDate={localEndDate}
+          projectBudgeted={project.budgeted}
+          projectSpent={totalExpenses}
           onSave={newStep => {
             const next = [...milestones, newStep];
             setMilestones(next);
             const newExpenses = contractorExpenseForMilestone(newStep, expenses);
             if (newExpenses !== expenses) setExpenses(newExpenses);
-            propagate(next, newExpenses);
+            const details: string[] = [];
+            if (newStep.startDate) details.push(`início previsto ${fmtDate(newStep.startDate)}`);
+            if (newStep.deadline) details.push(`prazo ${fmtDate(newStep.deadline)}`);
+            if (newStep.contractorName) details.push(`empreiteiro ${newStep.contractorName}`);
+            if (newStep.contractorValue) details.push(`valor ${fmt(newStep.contractorValue)}`);
+            const desc = `Etapa "${newStep.label}" criada${details.length > 0 ? ` — ${details.join(", ")}` : ""}.`;
+            const { progress, phase } = computeDerived(next);
+            const updatedProject = addProjectHistory(
+              { ...project, milestones: next, expenses: newExpenses, status, progress, phase },
+              desc
+            );
+            onUpdateProject?.(updatedProject);
           }}
         />
       )}
@@ -2328,11 +2456,17 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                     dueDate: expenseDraft.paymentStatus === "A fazer" ? expenseDraft.dueDate : undefined,
                   } : { isPayment: false, paymentStatus: undefined, dueDate: undefined };
                   let nextExpenses: Expense[];
+                  let historyDesc: string;
                   if (editingExpenseId !== null) {
+                    const oldExpense = expenses.find(e => e.id === editingExpenseId);
                     nextExpenses = expenses.map(e => e.id === editingExpenseId
                       ? { ...e, description: expenseDraft.description, category: expenseDraft.category, amount: parsed, notes: expenseDraft.notes || undefined, ...paymentFields }
                       : e
                     );
+                    const justPaid = oldExpense?.isPayment && oldExpense.paymentStatus === "A fazer" && paymentFields.isPayment && paymentFields.paymentStatus === "Realizado";
+                    historyDesc = justPaid
+                      ? `Pagamento "${expenseDraft.description}" marcado como realizado — ${fmt(parsed)}.`
+                      : `Despesa "${expenseDraft.description}" atualizada — ${fmt(parsed)}.`;
                   } else {
                     const now = new Date();
                     const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -2346,9 +2480,16 @@ function ProjectDetail({ project, onBack, onUpdateProject }: {
                       notes: expenseDraft.notes || undefined,
                       ...paymentFields,
                     }];
+                    historyDesc = paymentFields.isPayment
+                      ? `Pagamento "${expenseDraft.description}" registrado — ${fmt(parsed)}.`
+                      : `Despesa "${expenseDraft.description}" registrada — ${fmt(parsed)}.`;
                   }
                   setExpenses(nextExpenses);
-                  onUpdateProject?.({ ...project, milestones, expenses: nextExpenses, status, progress: computedProgress, phase: computedPhase });
+                  const updatedProject = addProjectHistory(
+                    { ...project, milestones, expenses: nextExpenses, status, progress: computedProgress, phase: computedPhase },
+                    historyDesc
+                  );
+                  onUpdateProject?.(updatedProject);
                   setExpenseDraft({ description: "", category: "Material", amount: "", notes: "", isPayment: false, paymentStatus: "A fazer", dueDate: "" });
                   setEditingExpenseId(null);
                   setAddingExpense(false);
@@ -4110,6 +4251,7 @@ export default function App() {
       startDate: q.startDate || "–",
       endDate: q.endDate || "–",
       quoteDeadline: q.quoteDeadline ?? "",
+      history: [{ datetime: nowTs(), description: `Obra criada a partir do orçamento aprovado de ${q.clientName}.` }],
     };
     projectsApi.create(payload)
       .then(created => {
